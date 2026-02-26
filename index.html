@@ -106,15 +106,37 @@
       <section class="card page hidden" id="page-engineers"></section>
       <section class="card page hidden" id="page-workers"></section>
 
-      <section class="card page hidden" id="page-settings">
-        <h2>الإعدادات</h2>
-        <div class="small dim">إذا كان رابط الـ API مختلف (Workers)، ضعه هنا:</div>
-        <div class="row">
-          <input class="input" id="apiOverride" placeholder="https://majma-adl-api.xxx.workers.dev" />
-          <button class="btn" id="saveApi">حفظ</button>
-          <button class="btn btn--ghost" id="resetApi">إرجاع</button>
-        </div>
-      </section>
+   <section class="card page hidden" id="page-settings">
+  <h2>الإعدادات</h2>
+
+  <div class="card inner" style="margin-top:10px;">
+    <div class="small dim">إذا كان رابط الـ API مختلف (Workers)، ضعه هنا:</div>
+    <div class="row" style="margin-top:10px;">
+      <input class="input" id="apiOverride" placeholder="https://majma-adl-api.xxx.workers.dev" />
+      <button class="btn" id="saveApi">حفظ</button>
+      <button class="btn btn--ghost" id="resetApi">إرجاع</button>
+    </div>
+  </div>
+
+  <div class="card inner" style="margin-top:12px;">
+    <h3 style="margin:0 0 8px;">النسخ الاحتياطي / الاستيراد</h3>
+    <div class="small dim">تصدير نسخة كاملة (JSON) أو استيرادها لاحقاً. هذا يحفظ كل البيانات.</div>
+
+    <div class="row" style="margin-top:10px;">
+      <button class="btn btn--primary" id="exportJsonBtn">تصدير نسخة احتياطية JSON</button>
+
+      <label class="btn" for="importJsonFile" style="cursor:pointer">استيراد JSON</label>
+      <input id="importJsonFile" type="file" accept=".json,application/json" style="display:none" />
+
+      <button class="btn" id="wipeBtn">مسح البيانات المحلية</button>
+    </div>
+
+    <div class="hint" style="margin-top:10px;">
+      نصيحة: خزن ملف الـ JSON على جهازك/Google Drive حتى تضمن عدم ضياع البيانات.
+    </div>
+  </div>
+</section>
+
 
     </main>
   </div>
