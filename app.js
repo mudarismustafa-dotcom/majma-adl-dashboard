@@ -612,8 +612,9 @@
     const arr = db[m.store] || [];
     const row = id ? arr.find(x=>x.id===id) : null;
 
-    modalCtx = { key, id };
-    modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
+    if (modalTitle) {
+  modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
+}
     modalSub.textContent = id ? ("ID: "+id) : "—";
     modalBack.classList.remove("hidden");
 
