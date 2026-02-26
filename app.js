@@ -22,14 +22,12 @@
     if(t) localStorage.setItem(AUTH_TOKEN_KEY, t);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
   }
-
   function setRole(role){
     sessionStorage.setItem(AUTH_ROLE_KEY, role || "admin");
   }
   function getRole(){
     return sessionStorage.getItem(AUTH_ROLE_KEY) || "admin";
   }
-
   function isAuthed(){
     return sessionStorage.getItem(AUTH_OK_KEY) === "1" && !!getToken();
   }
@@ -49,17 +47,65 @@
     back.classList.toggle("hidden", !show);
   }
 
-  async function apiFetch(path, opts={}){
-    const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
-    const t = getToken();
-    if(t) headers["Authorization"] = "Bearer " + t;
-    const res = await fetch(path, Object.assign({}, opts, {headers}));
-    return res;
-  }
-
   function roleFromUsername(u){
     if(String(u).toLowerCase() === ENGINEER_USER.toLowerCase()) return "engineer";
     return "admin";
+  }
+
+  // -----------------------
+  // API Base (Workers) + Status
+  // -----------------------
+  const API_OVERRIDE_KEY = "majma_adl_api_base_override";
+
+  function getApiBase(){
+    const ov = (localStorage.getItem(API_OVERRIDE_KEY) || "").trim();
+    // لو فارغ => يستخدم نفس الدومين (./api/...)
+    return ov || "";
+  }
+
+  function apiUrl(path){
+    // path مثل "/api/db" أو "./api/db"
+    const p = String(path || "").replace(/^\.\//, "/").replace(/^\/?/, "/");
+    const base = getApiBase();
+    if(!base) return "." + p; // نفس الموقع
+    return base.replace(/\/+$/,"") + p;
+  }
+
+  async function apiFetch(path, opts={}){
+    const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
+    const t = getToken();
+    if(t && t !== "OFFLINE") headers["Authorization"] = "Bearer " + t;
+    return await fetch(apiUrl(path), Object.assign({}, opts, {headers}));
+  }
+
+  async function pingServer(){
+    const pill = $("apiStatus");
+    const baseEl = $("apiBase");
+
+    const base = getApiBase();
+    if(baseEl) baseEl.textContent = base ? base : "(نفس الموقع)";
+
+    const t = getToken();
+    if(!pill) return;
+
+    if(!t || t === "OFFLINE"){
+      pill.textContent = "محلي (OFFLINE)";
+      pill.style.opacity = "1";
+      return;
+    }
+
+    try{
+      // جرّب مسار بسيط - إذا ما عندك هذا بالـ Worker راح يفشل ويظل غير متصل
+      const res = await apiFetch("/api/health", {method:"GET"});
+      if(res.ok){
+        pill.textContent = "متصل";
+        pill.style.opacity = "1";
+        return;
+      }
+    }catch{}
+
+    pill.textContent = "غير متصل";
+    pill.style.opacity = "1";
   }
 
   async function tryLogin(username, password){
@@ -68,7 +114,7 @@
 
     // Try online login first
     try{
-      const res = await fetch("./api/auth/login", {
+      const res = await fetch(apiUrl("/api/auth/login"), {
         method:"POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({username: uNorm, password: pNorm})
@@ -80,7 +126,6 @@
           setToken(data.token);
           sessionStorage.setItem(AUTH_OK_KEY, "1");
           sessionStorage.setItem(AUTH_USER_KEY, data.username || uNorm);
-          // role from server if provided, else infer from username
           setRole(data.role || roleFromUsername(data.username || uNorm));
           return true;
         }
@@ -151,7 +196,7 @@
     const t = getToken();
     if(!t || t==="OFFLINE") return false;
     try{
-      const res = await apiFetch("./api/db", {method:"GET"});
+      const res = await apiFetch("/api/db", {method:"GET"});
       if(res.status===401){ lock(); return false; }
       if(!res.ok) return false;
       const data = await res.json();
@@ -171,7 +216,7 @@
     pushTimer = setTimeout(async ()=>{
       try{
         const db = loadDB();
-        await apiFetch("./api/db", {method:"PUT", body: JSON.stringify(db)});
+        await apiFetch("/api/db", {method:"PUT", body: JSON.stringify(db)});
       }catch{}
     }, 700);
   }
@@ -284,7 +329,7 @@
   function canAccess(pageKey){
     const role = getRole();
     if(role === "engineer"){
-      return pageKey === "engineers"; // ✅ المهندس يشوف المهندسون فقط
+      return pageKey === "engineers"; // المهندس يشوف المهندسون فقط
     }
     return true; // admin يشوف الكل
   }
@@ -292,7 +337,7 @@
   function applyRoleUI(){
     const role = getRole();
 
-    // اخفي عناصر القائمة حسب الصلاحية
+    // اخفاء عناصر القائمة حسب الدور
     document.querySelectorAll(".nav__item").forEach(btn=>{
       const k = btn.dataset.page;
       btn.style.display = canAccess(k) ? "" : "none";
@@ -305,7 +350,6 @@
   }
 
   function showPage(key){
-    // Guard
     if(!canAccess(key)){
       key = "engineers";
     }
@@ -330,7 +374,7 @@
       reports:"التقارير",
       settings:"الإعدادات",
     };
-    pageTitle.textContent = titles[key] || "الرئيسية";
+    if(pageTitle) pageTitle.textContent = titles[key] || "الرئيسية";
     renderPage(key);
   }
 
@@ -512,6 +556,9 @@
     const el = $("page-"+key);
     if(!el) return;
 
+    // حماية: المهندس يبقى داخل engineers فقط
+    if(!canAccess(key)) return showPage("engineers");
+
     const cols = (m.fields || []).map(f=>`<th>${f.label}</th>`).join("");
     el.innerHTML = `
       <div class="toolbar">
@@ -548,6 +595,7 @@
 
     if(m.seed){
       hook(`${key}SeedBtn`, ()=>{
+        if(getRole() !== "admin") return;
         const db = loadDB();
         m.seed(db);
         saveDB(db);
@@ -668,7 +716,7 @@
   }
 
   // -----------------------
-  // Modal (Add/Edit/Delete) - يعتمد على #modalBack
+  // Modal (Add/Edit/Delete)
   // -----------------------
   const modalBack = $("modalBack");
   const modalTitle = $("modalTitle");
@@ -683,7 +731,7 @@
     const m = Modules[key];
     if(!m || !m.fields) return;
 
-    // Guard للمهندس: فقط engineers
+    // Guard للمهندس
     if(!canAccess(key)) return showPage("engineers");
 
     const db = loadDB();
@@ -691,12 +739,13 @@
     const row = id ? arr.find(x=>x.id===id) : null;
 
     modalCtx = { key, id };
-    modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
-    modalSub.textContent = id ? ("ID: "+id) : "—";
-    modalBack.classList.remove("hidden");
+    if(modalTitle) modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
+    if(modalSub) modalSub.textContent = id ? ("ID: "+id) : "—";
+    modalBack?.classList.remove("hidden");
 
     modalForm.innerHTML = m.fields.map(f=>{
-      const v = row ? (row[f.key] ?? "") : (m.defaultRow ? (m.defaultRow()[f.key] ?? "") : "");
+      const def = m.defaultRow ? m.defaultRow() : {};
+      const v = row ? (row[f.key] ?? "") : (def[f.key] ?? "");
       const req = f.required ? "required" : "";
       if(f.type==="select"){
         const opts = (f.options||[]).map(o=>{
@@ -724,10 +773,10 @@
       </div>`;
     }).join("");
 
-    modalDelete.style.display = id ? "inline-block" : "none";
+    if(modalDelete) modalDelete.style.display = id ? "inline-block" : "none";
   }
 
-  function closeModal(){ modalBack.classList.add("hidden"); }
+  function closeModal(){ modalBack?.classList.add("hidden"); }
   modalClose?.addEventListener("click", closeModal);
   modalBack?.addEventListener("click",(e)=>{ if(e.target===modalBack) closeModal(); });
 
@@ -736,7 +785,6 @@
     const m = Modules[key];
     if(!m) return;
 
-    // Guard للمهندس
     if(!canAccess(key)) return showPage("engineers");
 
     const db = loadDB();
@@ -777,10 +825,7 @@
   modalDelete?.addEventListener("click", ()=>{
     const {key, id} = modalCtx;
     if(!id) return;
-
-    // Guard للمهندس
     if(!canAccess(key)) return showPage("engineers");
-
     if(!confirm("تأكيد الحذف؟")) return;
     const m = Modules[key];
     const db = loadDB();
@@ -834,15 +879,31 @@
   function renderAll(){
     const db = loadDB();
     refreshKPIs(db);
-    const active = document.querySelector(".nav__item.active")?.dataset.page || (getRole()==="engineer" ? "engineers" : "dashboard");
+    const roleDefault = (getRole()==="engineer") ? "engineers" : "dashboard";
+    const active = document.querySelector(".nav__item.active")?.dataset.page || roleDefault;
     renderPage(active);
   }
 
   // -----------------------
-  // Settings buttons (if موجودة بالـ HTML)
+  // Settings: API base + Backup (إذا موجودة بالـ HTML)
   // -----------------------
-  $("exportJsonBtn")?.addEventListener("click", exportBackupJSON);
+  $("saveApi")?.addEventListener("click", async ()=>{
+    const v = ($("apiOverride")?.value || "").trim();
+    if(v) localStorage.setItem(API_OVERRIDE_KEY, v);
+    else localStorage.removeItem(API_OVERRIDE_KEY);
+    await pingServer();
+    alert("✅ تم حفظ رابط الـ API.");
+  });
 
+  $("resetApi")?.addEventListener("click", async ()=>{
+    localStorage.removeItem(API_OVERRIDE_KEY);
+    if($("apiOverride")) $("apiOverride").value = "";
+    await pingServer();
+    alert("✅ تم إرجاع الرابط للوضع الافتراضي.");
+  });
+
+  // backup buttons (إذا موجودة)
+  $("exportJsonBtn")?.addEventListener("click", exportBackupJSON);
   $("importJsonFile")?.addEventListener("change", async (e)=>{
     const f = e.target.files?.[0];
     e.target.value = "";
@@ -860,7 +921,7 @@
 
   // زر توليد 500 وحدة (الهيدر) - admin فقط
   $("seedBtn")?.addEventListener("click", ()=>{
-    if(getRole() !== "admin") return; // حماية إضافية
+    if(getRole() !== "admin") return;
     const db = loadDB();
     Modules.units.seed(db);
     saveDB(db);
@@ -880,6 +941,11 @@
   // Boot
   // -----------------------
   async function boot(){
+    // ضع قيمة الإعداد داخل input إذا موجود
+    if($("apiOverride")){
+      $("apiOverride").value = getApiBase();
+    }
+
     if(!isAuthed()){
       showLogin(true);
       const btn = $("loginBtn");
@@ -894,11 +960,11 @@
         if(ok){
           showLogin(false);
           if(inpPass) inpPass.value = "";
-          await syncFromServer();
 
           applyRoleUI();
+          await syncFromServer();
+          await pingServer();
 
-          // ✅ توجيه حسب الدور
           if(getRole() === "engineer"){
             showPage("engineers");
           }else{
@@ -916,12 +982,12 @@
     }
 
     showLogin(false);
-    await syncFromServer();
 
     applyRoleUI();
+    await syncFromServer();
+    await pingServer();
 
     const db = loadDB();
-    // seed للادمن فقط
     if(getRole() === "admin"){
       Modules.units.seed(db);
       saveDB(db);
@@ -929,7 +995,6 @@
 
     registerSW();
 
-    // ✅ توجيه حسب الدور
     if(getRole() === "engineer"){
       showPage("engineers");
     }else{
