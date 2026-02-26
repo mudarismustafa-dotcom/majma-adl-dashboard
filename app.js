@@ -213,6 +213,29 @@
   }
 
   // -----------------------
+  // ✅ Backup / Restore (JSON)
+  // -----------------------
+  function exportBackupJSON(){
+    const db = loadDB();
+    const fname = `majma_adl_backup_${todayISO()}.json`;
+    downloadText(fname, JSON.stringify(db, null, 2), "application/json;charset=utf-8");
+  }
+
+  async function importBackupJSON(file){
+    const text = await readFileText(file);
+    try{
+      const obj = JSON.parse(text);
+      const merged = Object.assign(emptyDB(), obj || {});
+      localStorage.setItem(DB_KEY, JSON.stringify(merged));
+      DB_MEM = merged;
+      alert("✅ تم الاستيراد بنجاح.");
+      renderAll();
+    }catch{
+      alert("❌ ملف JSON غير صالح.");
+    }
+  }
+
+  // -----------------------
   // UI Shell
   // -----------------------
   const nav = $("nav");
@@ -728,6 +751,35 @@
     const active = document.querySelector(".nav__item.active")?.dataset.page || "dashboard";
     renderPage(active);
   }
+
+  // -----------------------
+  // ✅ Settings (Backup buttons)
+  // -----------------------
+  $("exportJsonBtn")?.addEventListener("click", exportBackupJSON);
+
+  $("importJsonFile")?.addEventListener("change", async (e)=>{
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if(!f) return;
+    await importBackupJSON(f);
+  });
+
+  $("wipeBtn")?.addEventListener("click", ()=>{
+    if(!confirm("سيتم حذف كل البيانات المحفوظة محلياً. هل أنت متأكد؟")) return;
+    localStorage.removeItem(DB_KEY);
+    DB_MEM = null;
+    alert("✅ تم حذف البيانات.");
+    renderAll();
+  });
+
+  // زر توليد 500 وحدة (الزر في الهيدر)
+  $("seedBtn")?.addEventListener("click", ()=>{
+    const db = loadDB();
+    Modules.units.seed(db);
+    saveDB(db);
+    renderAll();
+    alert("✅ تم توليد/تثبيت 500 وحدة (إذا كانت موجودة مسبقاً لن تتكرر).");
+  });
 
   // -----------------------
   // PWA
