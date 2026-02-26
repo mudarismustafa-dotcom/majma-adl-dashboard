@@ -75,12 +75,16 @@
               <div class="kpi__value" id="kpiUnits">--</div>
             </div>
             <div class="kpi">
-              <div class="kpi__label">نسبة الإنجاز</div>
-              <div class="kpi__value" id="kpiProgress">--</div>
+              <div class="kpi__label">قيد التنفيذ</div>
+              <div class="kpi__value" id="kpiInProgress">--</div>
             </div>
             <div class="kpi">
-              <div class="kpi__label">المقاولون</div>
-              <div class="kpi__value" id="kpiContractors">--</div>
+              <div class="kpi__label">منجزة</div>
+              <div class="kpi__value" id="kpiDone">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi__label">الرصيد</div>
+              <div class="kpi__value" id="kpiBalance">--</div>
             </div>
           </div>
         </div>
@@ -89,72 +93,18 @@
       <section class="card page" id="page-dashboard">
         <h2>لوحة مختصرة</h2>
         <div class="row">
-          <div class="stat"><div class="stat__title">قيد التنفيذ</div><div class="stat__value" id="statInProgress">--</div></div>
-          <div class="stat"><div class="stat__title">منجزة</div><div class="stat__value" id="statDone">--</div></div>
-          <div class="stat"><div class="stat__title">غير بادئة</div><div class="stat__value" id="statNotStarted">--</div></div>
+          <div class="stat"><div class="stat__title">عدد الأصناف</div><div class="stat__value" id="statItems">--</div></div>
+          <div class="stat"><div class="stat__title">إجمالي المشتريات</div><div class="stat__value" id="statPurchases">--</div></div>
+          <div class="stat"><div class="stat__title">إجمالي المصروفات</div><div class="stat__value" id="statExpenses">--</div></div>
         </div>
         <p class="small dim">هذه نسخة أولى جاهزة للتوسع (مشتريات/محاسبة/مخزن كامل) حسب أولوياتك.</p>
       </section>
 
-      <section class="card page hidden" id="page-units">
-        <div class="toolbar">
-          <div class="toolbar__left">
-            <h2>الوحدات السكنية</h2>
-            <div class="small dim">بحث + تفاصيل الوحدة + تعديل التعيين + مراحل البناء + العمال</div>
-          </div>
-          <div class="toolbar__right">
-            <input class="input" id="unitsSearch" placeholder="بحث برقم الوحدة..." />
-            <select class="input" id="unitsBlock"><option value="">كل البلوكات</option></select>
-            <button class="btn" id="unitsRefresh">تحديث</button>
-            <button class="btn btn--primary" id="unitCreate">+ إضافة وحدة</button>
-          </div>
-        </div>
-        <div class="tableWrap">
-          <table class="table">
-            <thead><tr><th>رقم</th><th>بلوك</th><th>الحالة</th><th>الإنجاز</th><th>إجراء</th></tr></thead>
-            <tbody id="unitsTbody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card page hidden" id="page-contractors">
-        <div class="toolbar">
-          <div class="toolbar__left"><h2>المقاولون</h2></div>
-          <div class="toolbar__right"><button class="btn btn--primary" id="contractorCreate">+ إضافة مقاول</button></div>
-        </div>
-        <div class="tableWrap">
-          <table class="table">
-            <thead><tr><th>الاسم</th><th>الهاتف</th><th>الحالة</th><th>إجراء</th></tr></thead>
-            <tbody id="contractorsTbody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card page hidden" id="page-engineers">
-        <div class="toolbar">
-          <div class="toolbar__left"><h2>المهندسون</h2></div>
-          <div class="toolbar__right"><button class="btn btn--primary" id="engineerCreate">+ إضافة مهندس</button></div>
-        </div>
-        <div class="tableWrap">
-          <table class="table">
-            <thead><tr><th>الاسم</th><th>نوع الراتب</th><th>المبلغ</th><th>إجراء</th></tr></thead>
-            <tbody id="engineersTbody"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <section class="card page hidden" id="page-workers">
-        <div class="toolbar">
-          <div class="toolbar__left"><h2>العمال</h2></div>
-          <div class="toolbar__right"><button class="btn btn--primary" id="workerCreate">+ إضافة عامل</button></div>
-        </div>
-        <div class="tableWrap">
-          <table class="table">
-            <thead><tr><th>الاسم</th><th>نوع الراتب</th><th>المبلغ</th><th>إجراء</th></tr></thead>
-            <tbody id="workersTbody"></tbody>
-          </table>
-        </div>
-      </section>
+      <!-- الأقسام: سيتم بناؤها/تعبئتها من app.js -->
+      <section class="card page hidden" id="page-units"></section>
+      <section class="card page hidden" id="page-contractors"></section>
+      <section class="card page hidden" id="page-engineers"></section>
+      <section class="card page hidden" id="page-workers"></section>
 
       <section class="card page hidden" id="page-settings">
         <h2>الإعدادات</h2>
@@ -169,67 +119,27 @@
     </main>
   </div>
 
-  <!-- نافذة تفاصيل الوحدة -->
-  <div class="modalBack hidden" id="unitModalBack">
+  <!-- ✅ المودال العام (مهم جداً لعمل الإضافة/التعديل بكل الأقسام) -->
+  <div class="modalBack hidden" id="modalBack">
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal__head">
         <div>
-          <h2 id="unitModalTitle">تفاصيل الوحدة</h2>
-          <div class="small dim" id="unitModalSub">—</div>
+          <h2 id="modalTitle">—</h2>
+          <div class="small dim" id="modalSub">—</div>
         </div>
-        <button class="btn btn--ghost" id="unitModalClose">إغلاق</button>
-      </div>
-
-      <div class="grid2">
-        <div class="card inner">
-          <h3>التعيين (مقاول / مهندس / تواريخ)</h3>
-          <div class="form">
-            <label>المقاول</label>
-            <select class="input" id="assignContractor"></select>
-
-            <label>المهندس المشرف</label>
-            <select class="input" id="assignEngineer"></select>
-
-            <div class="row">
-              <div class="col">
-                <label>تاريخ بدء العمل</label>
-                <input class="input" type="date" id="assignStart" />
-              </div>
-              <div class="col">
-                <label>تاريخ الإنجاز الفعلي</label>
-                <input class="input" type="date" id="assignEnd" />
-              </div>
-            </div>
-
-            <button class="btn btn--primary" id="assignSave">حفظ التعيين</button>
-          </div>
-        </div>
-
-        <div class="card inner">
-          <h3>مراحل البناء</h3>
-          <div id="stagesBox" class="stages"></div>
-          <button class="btn" id="stagesSave">حفظ مراحل البناء</button>
-        </div>
+        <button class="btn btn--ghost" id="modalClose">إغلاق</button>
       </div>
 
       <div class="card inner" style="margin-top:12px;">
-        <div class="toolbar">
-          <div class="toolbar__left"><h3>العمال في الوحدة</h3></div>
-          <div class="toolbar__right">
-            <select class="input" id="workerSelect"></select>
-            <input class="input" id="workerType" placeholder="نوع العمل (مثال: سيراميك)" />
-            <button class="btn btn--primary" id="workerAdd">إضافة</button>
-          </div>
-        </div>
-        <div class="tableWrap">
-          <table class="table">
-            <thead><tr><th>الاسم</th><th>نوع العمل</th><th>من</th><th>إلى</th><th>إجراء</th></tr></thead>
-            <tbody id="unitWorkersTbody"></tbody>
-          </table>
+        <div class="form" id="modalForm"></div>
+
+        <div class="row" style="margin-top:12px; justify-content:flex-start;">
+          <button class="btn btn--primary" id="modalSave">حفظ</button>
+          <button class="btn badge--red" id="modalDelete" style="display:none">حذف</button>
         </div>
       </div>
-
     </div>
   </div>
+
 </body>
 </html>
