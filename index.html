@@ -1,167 +1,1794 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>مجمع العدل السكني - لوحة الإدارة</title>
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#0b0f17" />
-  <link rel="stylesheet" href="./styles.css" />
-  <script src="./app.js" defer></script>
-  <link rel="icon" href="./icon-192.png" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>مجمع العدل السكني - الإدارة (مخزن/محاسبة/مشتريات)</title>
+  <style>
+    :root{
+      --bg:#0b1220; --card:#121b2e; --muted:#9fb0d0; --text:#e8efff;
+      --accent:#4ea1ff; --ok:#3ddc97; --warn:#ffcc66; --bad:#ff6b6b;
+      --line:rgba(255,255,255,.08);
+      --radius:14px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Kufi Arabic", "Noto Sans Arabic", Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#071022, #0b1220 30%, #060b16);color:var(--text)}
+    a{color:inherit}
+    .topbar{
+      position:sticky;top:0;z-index:5;
+      background:rgba(11,18,32,.88);backdrop-filter: blur(10px);
+      border-bottom:1px solid var(--line);
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{
+      width:38px;height:38px;border-radius:12px;
+      background:radial-gradient(circle at 30% 30%, #7ec3ff, #3a7dff 60%, #2350ff);
+      box-shadow:0 10px 25px rgba(78,161,255,.25);
+    }
+    .title{font-weight:800}
+    .subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+    .nav{
+      display:flex;gap:8px;flex-wrap:wrap;margin-top:10px
+    }
+    .tab{
+      border:1px solid var(--line);background:rgba(255,255,255,.03);
+      padding:9px 12px;border-radius:999px;cursor:pointer;
+      color:var(--muted);font-weight:700;font-size:13px;
+      transition:.15s transform, .15s background, .15s color;
+      user-select:none;
+    }
+    .tab:hover{transform:translateY(-1px)}
+    .tab.active{background:rgba(78,161,255,.14);border-color:rgba(78,161,255,.35);color:var(--text)}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{
+      background:rgba(18,27,46,.9);border:1px solid var(--line);
+      border-radius:var(--radius);padding:14px;
+      box-shadow:0 18px 45px rgba(0,0,0,.25);
+    }
+    .card h3{margin:0 0 10px;font-size:15px}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    @media (max-width:900px){ .kpis{grid-template-columns:repeat(2,1fr)} }
+    .kpi{
+      padding:14px;border-radius:var(--radius);
+      background:rgba(255,255,255,.03);border:1px solid var(--line);
+    }
+    .kpi .n{font-size:22px;font-weight:900}
+    .kpi .l{color:var(--muted);font-size:12px;margin-top:4px}
+    .muted{color:var(--muted)}
+    .hr{height:1px;background:var(--line);margin:12px 0}
+    .btn{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      padding:10px 12px;border-radius:12px;
+      cursor:pointer;font-weight:800;font-size:13px;
+      display:inline-flex;gap:8px;align-items:center;
+    }
+    .btn.primary{background:rgba(78,161,255,.18);border-color:rgba(78,161,255,.35)}
+    .btn.ok{background:rgba(61,220,151,.12);border-color:rgba(61,220,151,.28)}
+    .btn.bad{background:rgba(255,107,107,.10);border-color:rgba(255,107,107,.25)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    input,select,textarea{
+      width:100%;padding:10px 10px;border-radius:12px;
+      border:1px solid var(--line);outline:none;
+      background:rgba(255,255,255,.03);color:var(--text);
+    }
+    textarea{min-height:90px;resize:vertical}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:800}
+    .form{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .col-3{grid-column:span 3}
+    .col-4{grid-column:span 4}
+    .col-5{grid-column:span 5}
+    .col-6{grid-column:span 6}
+    .col-7{grid-column:span 7}
+    .col-8{grid-column:span 8}
+    .col-12{grid-column:span 12}
+    @media (max-width:900px){
+      .col-3,.col-4,.col-5,.col-6,.col-7,.col-8{grid-column:span 12}
+    }
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--line);padding:10px 8px;text-align:right;font-size:13px}
+    th{color:var(--muted);font-size:12px}
+    tr:hover td{background:rgba(255,255,255,.02)}
+    .pill{padding:4px 8px;border-radius:999px;border:1px solid var(--line);font-size:12px;color:var(--muted);display:inline-block}
+    .pill.ok{border-color:rgba(61,220,151,.35);color:#bff5df;background:rgba(61,220,151,.08)}
+    .pill.warn{border-color:rgba(255,204,102,.35);color:#ffe3a6;background:rgba(255,204,102,.08)}
+    .pill.bad{border-color:rgba(255,107,107,.35);color:#ffb2b2;background:rgba(255,107,107,.08)}
+    .right{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-start}
+    .searchbar{display:flex;gap:10px;flex-wrap:wrap}
+    .small{font-size:12px}
+    .loginBack{
+      position:fixed;inset:0;background:rgba(0,0,0,.6);
+      display:flex;align-items:center;justify-content:center;z-index:10;
+      padding:18px;
+    }
+    .loginCard{max-width:440px;width:100%}
+    .hidden{display:none !important}
+    .toast{
+      position:fixed;bottom:14px;left:14px;z-index:20;
+      background:rgba(18,27,46,.95);border:1px solid var(--line);
+      padding:10px 12px;border-radius:14px;min-width:260px;
+      box-shadow:0 18px 45px rgba(0,0,0,.35);
+    }
+  </style>
 </head>
 <body>
-
-  <!-- شاشة تسجيل الدخول -->
-  <div class="loginBack hidden" id="loginBack">
-    <div class="loginCard">
-      <div class="loginBrand">
-        <img src="./logo.svg" alt="logo" style="width:72px;height:72px;object-fit:contain">
-        <h2 style="margin:8px 0 0">مجمع العدل السكني</h2>
-        <div class="small dim">تسجيل الدخول</div>
+  <div class="topbar">
+    <div class="wrap">
+      <div class="row">
+        <div class="brand">
+          <div class="logo"></div>
+          <div>
+            <div class="title">مجمع العدل السكني</div>
+            <div class="subtitle">لوحة الإدارة — مخزن / مشتريات / محاسبة / رواتب / آليات</div>
+          </div>
+        </div>
+        <div class="right">
+          <button class="btn" id="btnBackup">تصدير نسخة JSON</button>
+          <button class="btn" id="btnRestore">استيراد JSON</button>
+          <button class="btn" id="btnCSV">تصدير CSV</button>
+          <button class="btn bad" id="btnLock">قفل</button>
+        </div>
       </div>
-      <input id="loginUser" class="input" placeholder="اسم المستخدم" />
-      <input id="loginPass" type="password" class="input" placeholder="كلمة المرور" style="margin-top:8px" />
-      <button id="loginBtn" class="btn btn--primary" style="width:100%; margin-top:10px">دخول</button>
-      <div class="small dim" style="margin-top:8px">ادخل بيانات الدخول</div>
+      <div class="nav" id="nav"></div>
     </div>
   </div>
 
-  <div class="layout">
-    <aside class="sidebar">
-      <div class="brand">
-        <img class="brand__logo" src="./logo.svg" alt="شعار مجمع العدل السكني" />
+  <div class="wrap" id="app"></div>
+
+  <!-- Login -->
+  <div class="loginBack hidden" id="loginBack">
+    <div class="card loginCard">
+      <h3>تسجيل الدخول</h3>
+      <div class="muted small">كلمة المرور تحفظ محلياً. افتراضي: <b>@1000@</b></div>
+      <div class="hr"></div>
+      <label>كلمة المرور</label>
+      <input id="loginPass" type="password" placeholder="ادخل كلمة المرور"/>
+      <div class="hr"></div>
+      <div class="right">
+        <button class="btn primary" id="btnLogin">دخول</button>
       </div>
+    </div>
+  </div>
 
-      <nav class="nav" id="nav">
-        <button class="nav__item active" data-page="dashboard">الرئيسية</button>
-        <button class="nav__item" data-page="units">الوحدات السكنية</button>
-        <button class="nav__item" data-page="contractors">المقاولون</button>
-        <button class="nav__item" data-page="engineers">المهندسون</button>
-        <button class="nav__item" data-page="workers">العمال</button>
-        <button class="nav__item" data-page="settings">الإعدادات</button>
-      </nav>
+  <div class="toast hidden" id="toast"></div>
 
-      <div class="sidebar__footer">
-        <div class="small">حالة السيرفر:</div>
-        <div class="pill" id="apiStatus">غير متصل</div>
-        <div class="small dim" id="apiBase"></div>
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+
+  // -----------------------------
+  // Auth gate
+  // -----------------------------
+  const AUTH_KEY = "majma_adl_auth_ok";
+  const PASS_KEY = "majma_adl_password";
+  const DEFAULT_PASS = "@1000@";
+  const isAuthed = () => sessionStorage.getItem(AUTH_KEY)==="1";
+  const getPass = () => localStorage.getItem(PASS_KEY) || DEFAULT_PASS;
+  const lock = () => { sessionStorage.removeItem(AUTH_KEY); location.reload(); };
+
+  function showLogin(show){
+    $("loginBack").classList.toggle("hidden", !show);
+  }
+
+  // -----------------------------
+  // DB
+  // -----------------------------
+  const DB_KEY = "majma_adl_full_db_v2";
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+  const todayISO = () => new Date().toISOString().slice(0,10);
+
+  const defaultDB = () => ({
+    meta:{createdAt: Date.now(), version:"2.0"},
+    warehouse:{
+      categories:[
+        {id:"cat_build", name:"مواد البناء"},
+        {id:"cat_const", name:"مواد إنشائية"},
+        {id:"cat_elec", name:"مواد كهربائية"},
+        {id:"cat_water", name:"مواد الماء والصرف الصحي"},
+        {id:"cat_san", name:"مواد صحية"},
+        {id:"cat_steel", name:"مواد الحديد والشيش"},
+        {id:"cat_glass", name:"مواد الزجاج"},
+        {id:"cat_al", name:"الألمنيوم"},
+        {id:"cat_paint", name:"الأصباغ"},
+        {id:"cat_other", name:"أخرى"}
+      ],
+      items:[
+        // Example:
+        // {id, code, name, categoryId, unit, minQty, note}
+      ],
+      tx:[
+        // {id, date, type:"IN"|"OUT"|"ADJ", itemId, qty, unitCost, refType, refId, note}
+      ]
+    },
+    purchasing:{
+      suppliers:[
+        // {id, name, phone, note}
+      ],
+      invoices:[
+        // {id, date, supplierId, items:[{itemId, qty, unitCost}], note, paid}
+      ]
+    },
+    accounting:{
+      cashAccounts:[
+        {id:"cash_main", name:"الصندوق الرئيسي", opening:0}
+      ],
+      journal:[
+        // {id, date, kind, partyType, partyId, debit, credit, note, refType, refId}
+      ],
+      contractors:[
+        // {id, name, phone, note}
+      ],
+      employees:[
+        // {id, name, role, phone, salary}
+      ],
+      payroll:[
+        // {id, month:"2026-02", date, employeeId, base, bonus, deduction, paid, note}
+      ],
+      vehicles:[
+        // {id, name, plate, note}
+      ],
+      drivers:[
+        // {id, name, phone, note}
+      ],
+      fuelLogs:[
+        // {id, date, vehicleId, driverId, liters, cost, note}
+      ],
+      maintenanceLogs:[
+        // {id, date, vehicleId, cost, issue, note}
+      ]
+    }
+  });
+
+  function loadDB(){
+    try{
+      const raw = localStorage.getItem(DB_KEY);
+      if(!raw) return defaultDB();
+      const db = JSON.parse(raw);
+      // minimal migrations:
+      if(!db.warehouse) return defaultDB();
+      if(!db.accounting) db.accounting = defaultDB().accounting;
+      if(!db.purchasing) db.purchasing = defaultDB().purchasing;
+      if(!db.warehouse.categories) db.warehouse.categories = defaultDB().warehouse.categories;
+      return db;
+    }catch(e){
+      return defaultDB();
+    }
+  }
+
+  let db = loadDB();
+  const saveDB = () => localStorage.setItem(DB_KEY, JSON.stringify(db));
+
+  // -----------------------------
+  // Helpers
+  // -----------------------------
+  function toast(msg){
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.remove("hidden");
+    setTimeout(()=>t.classList.add("hidden"), 2500);
+  }
+
+  function fmt(n){
+    const x = Number(n||0);
+    return x.toLocaleString("ar-IQ", {maximumFractionDigits:2});
+  }
+
+  function dl(filename, text, mime="application/json"){
+    const blob = new Blob([text], {type:mime});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1200);
+  }
+
+  function getCategoryName(id){
+    return db.warehouse.categories.find(c=>c.id===id)?.name || "—";
+  }
+  function getSupplierName(id){
+    return db.purchasing.suppliers.find(s=>s.id===id)?.name || "—";
+  }
+  function getItem(id){
+    return db.warehouse.items.find(i=>i.id===id);
+  }
+  function getItemName(id){
+    return getItem(id)?.name || "—";
+  }
+  function getContractorName(id){
+    return db.accounting.contractors.find(x=>x.id===id)?.name || "—";
+  }
+  function getEmployeeName(id){
+    return db.accounting.employees.find(x=>x.id===id)?.name || "—";
+  }
+  function getVehicleName(id){
+    return db.accounting.vehicles.find(x=>x.id===id)?.name || "—";
+  }
+  function getDriverName(id){
+    return db.accounting.drivers.find(x=>x.id===id)?.name || "—";
+  }
+
+  // Stock calculations from tx
+  function stockOf(itemId){
+    let qty = 0;
+    for(const t of db.warehouse.tx){
+      if(t.itemId !== itemId) continue;
+      if(t.type==="IN") qty += Number(t.qty||0);
+      else if(t.type==="OUT") qty -= Number(t.qty||0);
+      else if(t.type==="ADJ") qty += Number(t.qty||0); // ADJ can be +/-
+    }
+    return qty;
+  }
+  function avgCost(itemId){
+    // weighted average based on IN and invoice-linked IN
+    let totalQty=0, totalCost=0;
+    for(const t of db.warehouse.tx){
+      if(t.itemId!==itemId) continue;
+      if(t.type!=="IN") continue;
+      const q = Number(t.qty||0);
+      const c = Number(t.unitCost||0);
+      if(q<=0) continue;
+      totalQty += q;
+      totalCost += q*c;
+    }
+    return totalQty>0 ? totalCost/totalQty : 0;
+  }
+
+  function totals(){
+    const invTotal = db.purchasing.invoices.reduce((acc, inv)=>{
+      const sum = (inv.items||[]).reduce((a,it)=>a + Number(it.qty||0)*Number(it.unitCost||0), 0);
+      return acc + sum;
+    },0);
+    const paidTotal = db.purchasing.invoices.reduce((acc, inv)=> acc + Number(inv.paid||0), 0);
+    const expenses = db.accounting.journal.reduce((acc,j)=> acc + Number(j.debit||0), 0);
+    return {invTotal, paidTotal, invDue: Math.max(0, invTotal - paidTotal), expenses};
+  }
+
+  // -----------------------------
+  // CSV export
+  // -----------------------------
+  function toCSV(rows){
+    const esc = (v)=> {
+      const s = String(v ?? "");
+      if(/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+      return s;
+    };
+    return rows.map(r=>r.map(esc).join(",")).join("\n");
+  }
+
+  function exportAllCSV(){
+    const lines = [];
+
+    // Items
+    lines.push("# ITEMS");
+    lines.push(toCSV([["code","name","category","unit","minQty","stock","avgCost","note"]]));
+    for(const it of db.warehouse.items){
+      lines.push(toCSV([[it.code||"", it.name||"", getCategoryName(it.categoryId), it.unit||"", it.minQty||0, stockOf(it.id), avgCost(it.id), it.note||""]]));
+    }
+
+    lines.push("\n# WAREHOUSE_TX");
+    lines.push(toCSV([["date","type","item","qty","unitCost","refType","refId","note"]]));
+    for(const t of db.warehouse.tx){
+      lines.push(toCSV([[t.date||"", t.type||"", getItemName(t.itemId), t.qty||0, t.unitCost||0, t.refType||"", t.refId||"", t.note||""]]));
+    }
+
+    lines.push("\n# SUPPLIERS");
+    lines.push(toCSV([["name","phone","note"]]));
+    for(const s of db.purchasing.suppliers){
+      lines.push(toCSV([[s.name||"", s.phone||"", s.note||""]]));
+    }
+
+    lines.push("\n# INVOICES");
+    lines.push(toCSV([["date","supplier","itemsCount","total","paid","note"]]));
+    for(const inv of db.purchasing.invoices){
+      const total = (inv.items||[]).reduce((a,it)=>a+Number(it.qty||0)*Number(it.unitCost||0),0);
+      lines.push(toCSV([[inv.date||"", getSupplierName(inv.supplierId), (inv.items||[]).length, total, inv.paid||0, inv.note||""]]));
+    }
+
+    lines.push("\n# JOURNAL");
+    lines.push(toCSV([["date","kind","partyType","party","debit","credit","note","refType","refId"]]));
+    for(const j of db.accounting.journal){
+      lines.push(toCSV([[j.date||"", j.kind||"", j.partyType||"", (j.partyType==="contractor"?getContractorName(j.partyId):j.partyType==="employee"?getEmployeeName(j.partyId):j.partyType==="supplier"?getSupplierName(j.partyId):"—"), j.debit||0, j.credit||0, j.note||"", j.refType||"", j.refId||""]]));
+    }
+
+    lines.push("\n# PAYROLL");
+    lines.push(toCSV([["month","date","employee","base","bonus","deduction","paid","note"]]));
+    for(const p of db.accounting.payroll){
+      lines.push(toCSV([[p.month||"", p.date||"", getEmployeeName(p.employeeId), p.base||0, p.bonus||0, p.deduction||0, p.paid||0, p.note||""]]));
+    }
+
+    lines.push("\n# FUEL_LOGS");
+    lines.push(toCSV([["date","vehicle","driver","liters","cost","note"]]));
+    for(const f of db.accounting.fuelLogs){
+      lines.push(toCSV([[f.date||"", getVehicleName(f.vehicleId), getDriverName(f.driverId), f.liters||0, f.cost||0, f.note||""]]));
+    }
+
+    lines.push("\n# MAINTENANCE_LOGS");
+    lines.push(toCSV([["date","vehicle","cost","issue","note"]]));
+    for(const m of db.accounting.maintenanceLogs){
+      lines.push(toCSV([[m.date||"", getVehicleName(m.vehicleId), m.cost||0, m.issue||"", m.note||""]]));
+    }
+
+    dl("majma-adl-export.csv", lines.join("\n"), "text/csv;charset=utf-8");
+    toast("تم تصدير CSV");
+  }
+
+  // -----------------------------
+  // UI routing
+  // -----------------------------
+  const tabs = [
+    {id:"home", label:"الرئيسية"},
+    {id:"warehouse", label:"المخزن"},
+    {id:"purchasing", label:"المشتريات"},
+    {id:"accounting", label:"المحاسبة"},
+    {id:"payroll", label:"الرواتب"},
+    {id:"fleet", label:"الآليات/السواق"},
+    {id:"settings", label:"الإعدادات"}
+  ];
+  let currentTab = "home";
+
+  function renderNav(){
+    const nav = $("nav");
+    nav.innerHTML = "";
+    for(const t of tabs){
+      const b = document.createElement("div");
+      b.className = "tab" + (t.id===currentTab ? " active":"");
+      b.textContent = t.label;
+      b.onclick = ()=>{ currentTab=t.id; render(); };
+      nav.appendChild(b);
+    }
+  }
+
+  function cardKPI(label, value, hint=""){
+    return `
+      <div class="kpi">
+        <div class="n">${value}</div>
+        <div class="l">${label}${hint?` • <span class="muted">${hint}</span>`:""}</div>
       </div>
-    </aside>
+    `;
+  }
 
-    <main class="main">
-      <header class="topbar">
-        <div class="topbar__left">
-          <h1 id="pageTitle">الرئيسية</h1>
-          <div class="small dim">نظام كامل يحفظ بيانات فعلياً (Cloudflare Workers + D1)</div>
-        </div>
-        <div class="topbar__right">
-          <button class="btn btn--ghost" id="seedBtn">توليد 500 وحدة</button>
-        </div>
-      </header>
+  function homeView(){
+    const t = totals();
+    const itemsCount = db.warehouse.items.length;
+    const txCount = db.warehouse.tx.length;
+    const suppliers = db.purchasing.suppliers.length;
+    const invCount = db.purchasing.invoices.length;
 
-      <section class="hero card">
-        <div class="hero__media">
-          <img src="./hero.png" alt="صورة واجهة" />
+    // quick low-stock
+    const low = db.warehouse.items
+      .map(it=>({it, stock:stockOf(it.id)}))
+      .filter(x=>Number(x.it.minQty||0)>0 && x.stock < Number(x.it.minQty||0))
+      .slice(0,8);
+
+    return `
+      <div class="card">
+        <h3>لوحة مختصرة</h3>
+        <div class="kpis">
+          ${cardKPI("عدد الأصناف", fmt(itemsCount))}
+          ${cardKPI("حركات المخزن", fmt(txCount))}
+          ${cardKPI("إجمالي المشتريات", fmt(t.invTotal), "دينار")}
+          ${cardKPI("إجمالي المصروفات", fmt(t.expenses), "دينار")}
         </div>
-        <div class="hero__text">
-          <h2>إدارة مجمع العدل السكني</h2>
-          <p class="dim">
-            إدارة الوحدات (500)، تعيين المقاول والمهندس، العمال، ومراحل البناء (أرض/هيكل/كامل).
-          </p>
-          <div class="row">
-            <div class="kpi">
-              <div class="kpi__label">عدد الوحدات</div>
-              <div class="kpi__value" id="kpiUnits">--</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi__label">قيد التنفيذ</div>
-              <div class="kpi__value" id="kpiInProgress">--</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi__label">منجزة</div>
-              <div class="kpi__value" id="kpiDone">--</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi__label">الرصيد</div>
-              <div class="kpi__value" id="kpiBalance">--</div>
+        <div class="hr"></div>
+        <div class="grid">
+          <div class="card" style="grid-column:span 7">
+            <h3>تنبيه: أصناف تحت الحد الأدنى</h3>
+            ${low.length?`
+              <table>
+                <thead><tr><th>الصنف</th><th>التصنيف</th><th>المتوفر</th><th>الحد الأدنى</th></tr></thead>
+                <tbody>
+                  ${low.map(x=>`
+                    <tr>
+                      <td>${x.it.name}</td>
+                      <td>${getCategoryName(x.it.categoryId)}</td>
+                      <td><span class="pill bad">${fmt(x.stock)} ${x.it.unit||""}</span></td>
+                      <td><span class="pill warn">${fmt(x.it.minQty||0)} ${x.it.unit||""}</span></td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            `:`<div class="muted">لا يوجد أصناف تحت الحد الأدنى حالياً.</div>`}
+          </div>
+          <div class="card" style="grid-column:span 5">
+            <h3>ملخص الذمم</h3>
+            <div class="muted small">متبقي موردين (تقريباً):</div>
+            <div style="font-size:26px;font-weight:900">${fmt(t.invDue)} <span class="muted small">دينار</span></div>
+            <div class="hr"></div>
+            <div class="muted small">عدد الموردين: <b>${suppliers}</b></div>
+            <div class="muted small">عدد الفواتير: <b>${invCount}</b></div>
+            <div class="hr"></div>
+            <div class="right">
+              <button class="btn primary" onclick="window.__nav('warehouse')">افتح المخزن</button>
+              <button class="btn primary" onclick="window.__nav('purchasing')">افتح المشتريات</button>
             </div>
           </div>
         </div>
-      </section>
-
-      <section class="card page" id="page-dashboard">
-        <h2>لوحة مختصرة</h2>
-        <div class="row">
-          <div class="stat"><div class="stat__title">عدد الأصناف</div><div class="stat__value" id="statItems">--</div></div>
-          <div class="stat"><div class="stat__title">إجمالي المشتريات</div><div class="stat__value" id="statPurchases">--</div></div>
-          <div class="stat"><div class="stat__title">إجمالي المصروفات</div><div class="stat__value" id="statExpenses">--</div></div>
-        </div>
-        <p class="small dim">هذه نسخة أولى جاهزة للتوسع (مشتريات/محاسبة/مخزن كامل) حسب أولوياتك.</p>
-      </section>
-
-      <!-- الأقسام: سيتم بناؤها/تعبئتها من app.js -->
-      <section class="card page hidden" id="page-units"></section>
-      <section class="card page hidden" id="page-contractors"></section>
-      <section class="card page hidden" id="page-engineers"></section>
-      <section class="card page hidden" id="page-workers"></section>
-
-   <section class="card page hidden" id="page-settings">
-  <h2>الإعدادات</h2>
-
-  <div class="card inner" style="margin-top:10px;">
-    <div class="small dim">إذا كان رابط الـ API مختلف (Workers)، ضعه هنا:</div>
-    <div class="row" style="margin-top:10px;">
-      <input class="input" id="apiOverride" placeholder="https://majma-adl-api.xxx.workers.dev" />
-      <button class="btn" id="saveApi">حفظ</button>
-      <button class="btn btn--ghost" id="resetApi">إرجاع</button>
-    </div>
-  </div>
-
-  <div class="card inner" style="margin-top:12px;">
-    <h3 style="margin:0 0 8px;">النسخ الاحتياطي / الاستيراد</h3>
-    <div class="small dim">تصدير نسخة كاملة (JSON) أو استيرادها لاحقاً. هذا يحفظ كل البيانات.</div>
-
-    <div class="row" style="margin-top:10px;">
-      <button class="btn btn--primary" id="exportJsonBtn">تصدير نسخة احتياطية JSON</button>
-
-      <label class="btn" for="importJsonFile" style="cursor:pointer">استيراد JSON</label>
-      <input id="importJsonFile" type="file" accept=".json,application/json" style="display:none" />
-
-      <button class="btn" id="wipeBtn">مسح البيانات المحلية</button>
-    </div>
-
-    <div class="hint" style="margin-top:10px;">
-      نصيحة: خزن ملف الـ JSON على جهازك/Google Drive حتى تضمن عدم ضياع البيانات.
-    </div>
-  </div>
-</section>
-
-
-    </main>
-  </div>
-
-  <!-- ✅ المودال العام (مهم جداً لعمل الإضافة/التعديل بكل الأقسام) -->
-  <div class="modalBack hidden" id="modalBack">
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal__head">
-        <div>
-          <h2 id="modalTitle">—</h2>
-          <div class="small dim" id="modalSub">—</div>
-        </div>
-        <button class="btn btn--ghost" id="modalClose">إغلاق</button>
       </div>
+    `;
+  }
 
-      <div class="card inner" style="margin-top:12px;">
-        <div class="form" id="modalForm"></div>
+  // -----------------------------
+  // Warehouse View
+  // -----------------------------
+  function warehouseView(){
+    const cats = db.warehouse.categories;
+    const items = db.warehouse.items;
 
-        <div class="row" style="margin-top:12px; justify-content:flex-start;">
-          <button class="btn btn--primary" id="modalSave">حفظ</button>
-          <button class="btn badge--red" id="modalDelete" style="display:none">حذف</button>
+    return `
+      <div class="card">
+        <h3>المخزن</h3>
+
+        <div class="grid">
+          <div class="card" style="grid-column:span 4">
+            <h3>إضافة صنف</h3>
+            <div class="form">
+              <div class="col-4">
+                <label>كود</label>
+                <input id="it_code" placeholder="مثال: CEM-001"/>
+              </div>
+              <div class="col-8">
+                <label>اسم الصنف</label>
+                <input id="it_name" placeholder="سمنت..."/>
+              </div>
+              <div class="col-6">
+                <label>التصنيف</label>
+                <select id="it_cat">
+                  ${cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-3">
+                <label>الوحدة</label>
+                <input id="it_unit" placeholder="كيس / متر / قطعة"/>
+              </div>
+              <div class="col-3">
+                <label>حد أدنى</label>
+                <input id="it_min" type="number" step="0.01" value="0"/>
+              </div>
+              <div class="col-12">
+                <label>ملاحظة</label>
+                <input id="it_note" placeholder="اختياري"/>
+              </div>
+              <div class="col-12">
+                <button class="btn ok" id="btnAddItem">حفظ الصنف</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <h3>إضافة تصنيف</h3>
+            <label>اسم التصنيف</label>
+            <input id="cat_name" placeholder="مثال: مواد السقف"/>
+            <div class="hr"></div>
+            <button class="btn" id="btnAddCat">إضافة تصنيف</button>
+          </div>
+
+          <div class="card" style="grid-column:span 8">
+            <div class="row">
+              <h3 style="margin:0">الأصناف</h3>
+              <div class="searchbar">
+                <input id="it_search" placeholder="بحث بالاسم/الكود..." style="min-width:260px"/>
+                <select id="it_filter_cat">
+                  <option value="">كل التصنيفات</option>
+                  ${cats.map(c=>`<option value="${c.id}">${c.name}</option>`).join("")}
+                </select>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div style="overflow:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th>كود</th><th>الصنف</th><th>التصنيف</th><th>المتوفر</th><th>متوسط الكلفة</th><th>إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="itemsTbody"></tbody>
+              </table>
+            </div>
+
+            <div class="hr"></div>
+            <h3>حركة مخزن (دخول/صرف/تسوية)</h3>
+            <div class="form">
+              <div class="col-3">
+                <label>التاريخ</label>
+                <input id="tx_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-3">
+                <label>النوع</label>
+                <select id="tx_type">
+                  <option value="IN">دخول</option>
+                  <option value="OUT">صرف</option>
+                  <option value="ADJ">تسوية (+/-)</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label>الصنف</label>
+                <select id="tx_item">
+                  ${items.map(it=>`<option value="${it.id}">${(it.code?it.code+" — ":"")}${it.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-3">
+                <label>الكمية</label>
+                <input id="tx_qty" type="number" step="0.01" value="1"/>
+              </div>
+              <div class="col-3">
+                <label>كلفة/وحدة (لدخول)</label>
+                <input id="tx_cost" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-6">
+                <label>ملاحظة</label>
+                <input id="tx_note" placeholder="مثال: صرف للوحدة 120"/>
+              </div>
+              <div class="col-12">
+                <button class="btn ok" id="btnAddTx">تسجيل الحركة</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <h3>آخر الحركات</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>تاريخ</th><th>نوع</th><th>صنف</th><th>كمية</th><th>كلفة</th><th>ملاحظة</th><th></th></tr></thead>
+                <tbody id="txTbody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    `;
+  }
 
+  function renderWarehouseTables(){
+    const q = ($("it_search")?.value||"").trim().toLowerCase();
+    const cat = $("it_filter_cat")?.value||"";
+    const rows = db.warehouse.items
+      .filter(it=>{
+        if(cat && it.categoryId!==cat) return false;
+        if(!q) return true;
+        return (it.name||"").toLowerCase().includes(q) || (it.code||"").toLowerCase().includes(q);
+      })
+      .map(it=>{
+        const st = stockOf(it.id);
+        const min = Number(it.minQty||0);
+        const pill = st < min && min>0 ? "bad" : (st===0 ? "warn":"ok");
+        return `
+          <tr>
+            <td>${it.code||""}</td>
+            <td>${it.name}</td>
+            <td>${getCategoryName(it.categoryId)}</td>
+            <td><span class="pill ${pill}">${fmt(st)} ${it.unit||""}</span></td>
+            <td>${fmt(avgCost(it.id))}</td>
+            <td class="right">
+              <button class="btn" onclick="window.__editItem('${it.id}')">تعديل</button>
+              <button class="btn bad" onclick="window.__delItem('${it.id}')">حذف</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+    $("itemsTbody").innerHTML = rows || `<tr><td colspan="6" class="muted">لا يوجد أصناف.</td></tr>`;
+
+    const tx = [...db.warehouse.tx].slice(-30).reverse();
+    $("txTbody").innerHTML = tx.map(t=>{
+      const pill = t.type==="IN"?"ok":t.type==="OUT"?"bad":"warn";
+      const typeLabel = t.type==="IN"?"دخول":t.type==="OUT"?"صرف":"تسوية";
+      return `
+        <tr>
+          <td>${t.date||""}</td>
+          <td><span class="pill ${pill}">${typeLabel}</span></td>
+          <td>${getItemName(t.itemId)}</td>
+          <td>${fmt(t.qty)} </td>
+          <td>${fmt(t.unitCost||0)}</td>
+          <td>${t.note||""}</td>
+          <td><button class="btn bad" onclick="window.__delTx('${t.id}')">حذف</button></td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="7" class="muted">لا توجد حركات.</td></tr>`;
+  }
+
+  // -----------------------------
+  // Purchasing View
+  // -----------------------------
+  function purchasingView(){
+    return `
+      <div class="card">
+        <h3>المشتريات (فواتير شراء خارجي)</h3>
+        <div class="grid">
+          <div class="card" style="grid-column:span 4">
+            <h3>إضافة مورد</h3>
+            <label>اسم المورد</label>
+            <input id="sup_name" placeholder="اسم الشركة/الشخص"/>
+            <div class="hr"></div>
+            <label>هاتف</label>
+            <input id="sup_phone" placeholder="اختياري"/>
+            <div class="hr"></div>
+            <label>ملاحظة</label>
+            <input id="sup_note" placeholder="اختياري"/>
+            <div class="hr"></div>
+            <button class="btn ok" id="btnAddSup">حفظ المورد</button>
+          </div>
+
+          <div class="card" style="grid-column:span 8">
+            <div class="row">
+              <h3 style="margin:0">إضافة فاتورة شراء</h3>
+              <div class="muted small">الفاتورة تسجل “دخول مخزن” تلقائياً + تسجل قيد محاسبي للمورد</div>
+            </div>
+            <div class="hr"></div>
+
+            <div class="form">
+              <div class="col-3">
+                <label>التاريخ</label>
+                <input id="inv_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-5">
+                <label>المورد</label>
+                <select id="inv_supplier">
+                  ${db.purchasing.suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-4">
+                <label>مدفوع الآن</label>
+                <input id="inv_paid" type="number" step="1" value="0"/>
+              </div>
+
+              <div class="col-12">
+                <label>ملاحظة</label>
+                <input id="inv_note" placeholder="رقم فاتورة/تفاصيل..."/>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <h3>أصناف الفاتورة</h3>
+            <div class="form">
+              <div class="col-6">
+                <label>الصنف</label>
+                <select id="inv_item">
+                  ${db.warehouse.items.map(it=>`<option value="${it.id}">${(it.code?it.code+" — ":"")}${it.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-3">
+                <label>الكمية</label>
+                <input id="inv_qty" type="number" step="0.01" value="1"/>
+              </div>
+              <div class="col-3">
+                <label>كلفة/وحدة</label>
+                <input id="inv_cost" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-12">
+                <button class="btn" id="btnAddInvLine">إضافة سطر</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>الصنف</th><th>الكمية</th><th>كلفة/وحدة</th><th>الإجمالي</th><th></th></tr></thead>
+                <tbody id="invLines"></tbody>
+              </table>
+            </div>
+
+            <div class="hr"></div>
+            <div class="row">
+              <div>
+                <div class="muted small">الإجمالي:</div>
+                <div style="font-size:22px;font-weight:900" id="invTotal">0</div>
+              </div>
+              <div class="right">
+                <button class="btn ok" id="btnSaveInvoice">حفظ الفاتورة</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <h3>آخر الفواتير</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>تاريخ</th><th>المورد</th><th>الإجمالي</th><th>مدفوع</th><th>متبقي</th><th>ملاحظة</th><th></th></tr></thead>
+                <tbody id="invTbody"></tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  let tmpInvLines = [];
+
+  function renderInvoiceLines(){
+    const total = tmpInvLines.reduce((a,l)=>a + Number(l.qty||0)*Number(l.unitCost||0), 0);
+    $("invTotal").textContent = fmt(total) + " دينار";
+    $("invLines").innerHTML = tmpInvLines.map((l,idx)=>{
+      const sum = Number(l.qty||0)*Number(l.unitCost||0);
+      return `
+        <tr>
+          <td>${getItemName(l.itemId)}</td>
+          <td>${fmt(l.qty)}</td>
+          <td>${fmt(l.unitCost)}</td>
+          <td>${fmt(sum)}</td>
+          <td><button class="btn bad" onclick="window.__rmInvLine(${idx})">حذف</button></td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="5" class="muted">لا توجد أسطر.</td></tr>`;
+  }
+
+  function renderInvoicesTable(){
+    const rows = [...db.purchasing.invoices].slice(-30).reverse().map(inv=>{
+      const total = (inv.items||[]).reduce((a,it)=>a+Number(it.qty||0)*Number(it.unitCost||0),0);
+      const due = Math.max(0, total - Number(inv.paid||0));
+      return `
+        <tr>
+          <td>${inv.date||""}</td>
+          <td>${getSupplierName(inv.supplierId)}</td>
+          <td>${fmt(total)}</td>
+          <td>${fmt(inv.paid||0)}</td>
+          <td><span class="pill ${due>0?"warn":"ok"}">${fmt(due)}</span></td>
+          <td>${inv.note||""}</td>
+          <td><button class="btn bad" onclick="window.__delInvoice('${inv.id}')">حذف</button></td>
+        </tr>
+      `;
+    }).join("");
+    $("invTbody").innerHTML = rows || `<tr><td colspan="7" class="muted">لا توجد فواتير.</td></tr>`;
+  }
+
+  // -----------------------------
+  // Accounting View
+  // -----------------------------
+  function accountingView(){
+    // balances
+    const cashId = "cash_main";
+    const opening = db.accounting.cashAccounts.find(a=>a.id===cashId)?.opening || 0;
+    const cashIn = db.accounting.journal.filter(j=>j.kind==="CASH_IN").reduce((a,j)=>a+Number(j.credit||0),0);
+    const cashOut = db.accounting.journal.filter(j=>j.kind==="CASH_OUT").reduce((a,j)=>a+Number(j.debit||0),0);
+    const cash = Number(opening) + Number(cashIn) - Number(cashOut);
+
+    // supplier dues (based on invoices)
+    const dueBySupplier = {};
+    for(const inv of db.purchasing.invoices){
+      const total = (inv.items||[]).reduce((a,it)=>a+Number(it.qty||0)*Number(it.unitCost||0),0);
+      const due = Math.max(0, total - Number(inv.paid||0));
+      dueBySupplier[inv.supplierId] = (dueBySupplier[inv.supplierId]||0) + due;
+    }
+    const topSup = Object.entries(dueBySupplier).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+    // contractor balances from journal
+    const contractorBal = {};
+    for(const j of db.accounting.journal){
+      if(j.partyType!=="contractor") continue;
+      contractorBal[j.partyId] = (contractorBal[j.partyId]||0) + Number(j.credit||0) - Number(j.debit||0);
+      // credit=مستحق عليه، debit=دفعناه له (لتبسيط العرض)
+    }
+    const topCon = Object.entries(contractorBal).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+    return `
+      <div class="card">
+        <h3>المحاسبة</h3>
+
+        <div class="kpis">
+          ${cardKPI("رصيد الصندوق (تقريبي)", fmt(cash), "دينار")}
+          ${cardKPI("قيود يومية", fmt(db.accounting.journal.length))}
+          ${cardKPI("مقاولون", fmt(db.accounting.contractors.length))}
+          ${cardKPI("موظفون", fmt(db.accounting.employees.length))}
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="grid">
+          <div class="card" style="grid-column:span 5">
+            <h3>إضافة قيد مصروف/صرف</h3>
+            <div class="muted small">استخدمه للوقود/الصيانة/مصروفات عامة/دفعات مقاول/أي صرف</div>
+            <div class="hr"></div>
+            <div class="form">
+              <div class="col-4">
+                <label>التاريخ</label>
+                <input id="j_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-8">
+                <label>النوع</label>
+                <select id="j_kind">
+                  <option value="EXPENSE">مصروف عام</option>
+                  <option value="CONTRACTOR_PAY">دفع مقاول</option>
+                  <option value="SALARY_PAY">دفع راتب</option>
+                  <option value="FUEL">وقود</option>
+                  <option value="MAINTENANCE">صيانة/عطل</option>
+                  <option value="CASH_IN">إيداع/إيراد للصندوق</option>
+                </select>
+              </div>
+
+              <div class="col-6">
+                <label>الجهة</label>
+                <select id="j_partyType">
+                  <option value="">بدون</option>
+                  <option value="contractor">مقاول</option>
+                  <option value="employee">موظف</option>
+                  <option value="supplier">مورد</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label>الاسم</label>
+                <select id="j_partyId"></select>
+              </div>
+
+              <div class="col-4">
+                <label>المبلغ (دينار)</label>
+                <input id="j_amount" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-8">
+                <label>ملاحظة</label>
+                <input id="j_note" placeholder="تفاصيل الصرف..."/>
+              </div>
+
+              <div class="col-12">
+                <button class="btn ok" id="btnAddJournal">حفظ القيد</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column:span 7">
+            <h3>إدارة المقاولين / الموظفين</h3>
+            <div class="grid">
+              <div class="card" style="grid-column:span 6">
+                <h3>إضافة مقاول</h3>
+                <label>اسم المقاول</label>
+                <input id="con_name" placeholder="اسم المقاول"/>
+                <div class="hr"></div>
+                <label>هاتف</label>
+                <input id="con_phone" placeholder="اختياري"/>
+                <div class="hr"></div>
+                <button class="btn" id="btnAddCon">حفظ</button>
+              </div>
+              <div class="card" style="grid-column:span 6">
+                <h3>إضافة موظف</h3>
+                <div class="form">
+                  <div class="col-12">
+                    <label>اسم الموظف</label>
+                    <input id="emp_name" placeholder="اسم الموظف"/>
+                  </div>
+                  <div class="col-6">
+                    <label>الوظيفة</label>
+                    <input id="emp_role" placeholder="حارس/محاسب..."/>
+                  </div>
+                  <div class="col-6">
+                    <label>راتب شهري</label>
+                    <input id="emp_salary" type="number" step="1" value="0"/>
+                  </div>
+                  <div class="col-12">
+                    <button class="btn" id="btnAddEmp">حفظ</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <div class="grid">
+              <div class="card" style="grid-column:span 6">
+                <h3>أعلى ذمم موردين</h3>
+                ${topSup.length?`
+                  <table>
+                    <thead><tr><th>المورد</th><th>متبقي</th></tr></thead>
+                    <tbody>
+                      ${topSup.map(([sid,amt])=>`
+                        <tr><td>${getSupplierName(sid)}</td><td><span class="pill warn">${fmt(amt)}</span></td></tr>
+                      `).join("")}
+                    </tbody>
+                  </table>
+                `:`<div class="muted">لا توجد ذمم.</div>`}
+              </div>
+              <div class="card" style="grid-column:span 6">
+                <h3>ذمم المقاولين (تقريبي)</h3>
+                <div class="muted small">الرقم = مستحق عليه (إن وجد)</div>
+                ${topCon.length?`
+                  <table>
+                    <thead><tr><th>المقاول</th><th>الرصيد</th></tr></thead>
+                    <tbody>
+                      ${topCon.map(([cid,amt])=>`
+                        <tr><td>${getContractorName(cid)}</td><td><span class="pill ${amt>0?"warn":"ok"}">${fmt(amt)}</span></td></tr>
+                      `).join("")}
+                    </tbody>
+                  </table>
+                `:`<div class="muted">لا توجد قيود مقاولين.</div>`}
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <h3>آخر القيود</h3>
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th>تاريخ</th><th>نوع</th><th>جهة</th><th>مدين (صرف)</th><th>دائن (إيراد)</th><th>ملاحظة</th><th></th></tr></thead>
+            <tbody id="jTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPartyDropdown(){
+    const type = $("j_partyType").value;
+    const sel = $("j_partyId");
+    let options = [];
+    if(type==="contractor") options = db.accounting.contractors.map(x=>({id:x.id, name:x.name}));
+    if(type==="employee") options = db.accounting.employees.map(x=>({id:x.id, name:x.name}));
+    if(type==="supplier") options = db.purchasing.suppliers.map(x=>({id:x.id, name:x.name}));
+    sel.innerHTML = options.length
+      ? options.map(o=>`<option value="${o.id}">${o.name}</option>`).join("")
+      : `<option value="">—</option>`;
+  }
+
+  function renderJournalTable(){
+    const rows = [...db.accounting.journal].slice(-40).reverse().map(j=>{
+      const party = j.partyType==="contractor"?getContractorName(j.partyId)
+        : j.partyType==="employee"?getEmployeeName(j.partyId)
+        : j.partyType==="supplier"?getSupplierName(j.partyId)
+        : "—";
+      return `
+        <tr>
+          <td>${j.date||""}</td>
+          <td><span class="pill">${j.kind||""}</span></td>
+          <td>${party}</td>
+          <td>${fmt(j.debit||0)}</td>
+          <td>${fmt(j.credit||0)}</td>
+          <td>${j.note||""}</td>
+          <td><button class="btn bad" onclick="window.__delJ('${j.id}')">حذف</button></td>
+        </tr>
+      `;
+    }).join("");
+    $("jTbody").innerHTML = rows || `<tr><td colspan="7" class="muted">لا توجد قيود.</td></tr>`;
+  }
+
+  // -----------------------------
+  // Payroll View
+  // -----------------------------
+  function payrollView(){
+    const emps = db.accounting.employees;
+    return `
+      <div class="card">
+        <h3>الرواتب</h3>
+        <div class="grid">
+          <div class="card" style="grid-column:span 4">
+            <h3>إضافة مسير راتب</h3>
+            <div class="form">
+              <div class="col-12">
+                <label>الموظف</label>
+                <select id="pr_emp">
+                  ${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-6">
+                <label>شهر</label>
+                <input id="pr_month" type="month" value="${todayISO().slice(0,7)}"/>
+              </div>
+              <div class="col-6">
+                <label>تاريخ الدفع</label>
+                <input id="pr_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-4">
+                <label>أساسي</label>
+                <input id="pr_base" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-4">
+                <label>مكافأة</label>
+                <input id="pr_bonus" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-4">
+                <label>استقطاع</label>
+                <input id="pr_ded" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-12">
+                <label>ملاحظة</label>
+                <input id="pr_note" placeholder="اختياري"/>
+              </div>
+              <div class="col-12">
+                <button class="btn ok" id="btnAddPayroll">حفظ المسير</button>
+              </div>
+            </div>
+            <div class="hr"></div>
+            <div class="muted small">تنبيه: عند حفظ المسير يسجل قيد “SALARY_PAY” تلقائياً.</div>
+          </div>
+
+          <div class="card" style="grid-column:span 8">
+            <h3>آخر المسيرات</h3>
+            <div style="overflow:auto">
+              <table>
+                <thead><tr><th>شهر</th><th>تاريخ</th><th>الموظف</th><th>صافي</th><th>ملاحظة</th><th></th></tr></thead>
+                <tbody id="prTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPayrollTable(){
+    const rows = [...db.accounting.payroll].slice(-40).reverse().map(p=>{
+      const net = Number(p.base||0)+Number(p.bonus||0)-Number(p.deduction||0);
+      return `
+        <tr>
+          <td>${p.month||""}</td>
+          <td>${p.date||""}</td>
+          <td>${getEmployeeName(p.employeeId)}</td>
+          <td><span class="pill ok">${fmt(net)}</span></td>
+          <td>${p.note||""}</td>
+          <td><button class="btn bad" onclick="window.__delPayroll('${p.id}')">حذف</button></td>
+        </tr>
+      `;
+    }).join("");
+    $("prTbody").innerHTML = rows || `<tr><td colspan="6" class="muted">لا يوجد مسيرات.</td></tr>`;
+  }
+
+  // -----------------------------
+  // Fleet View
+  // -----------------------------
+  function fleetView(){
+    return `
+      <div class="card">
+        <h3>الآليات / السواق</h3>
+        <div class="grid">
+          <div class="card" style="grid-column:span 4">
+            <h3>إضافة آلية</h3>
+            <label>اسم الآلية</label>
+            <input id="vh_name" placeholder="حفارة/شفل/بيك اب..."/>
+            <div class="hr"></div>
+            <label>رقم اللوحة</label>
+            <input id="vh_plate" placeholder="اختياري"/>
+            <div class="hr"></div>
+            <button class="btn" id="btnAddVh">حفظ الآلية</button>
+
+            <div class="hr"></div>
+            <h3>إضافة سائق</h3>
+            <label>اسم السائق</label>
+            <input id="dr_name" placeholder="اسم السائق"/>
+            <div class="hr"></div>
+            <label>هاتف</label>
+            <input id="dr_phone" placeholder="اختياري"/>
+            <div class="hr"></div>
+            <button class="btn" id="btnAddDr">حفظ السائق</button>
+          </div>
+
+          <div class="card" style="grid-column:span 8">
+            <h3>سجل الوقود</h3>
+            <div class="form">
+              <div class="col-3">
+                <label>التاريخ</label>
+                <input id="fu_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-4">
+                <label>الآلية</label>
+                <select id="fu_vehicle">
+                  ${db.accounting.vehicles.map(v=>`<option value="${v.id}">${v.name}${v.plate?` — ${v.plate}`:""}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-5">
+                <label>السائق</label>
+                <select id="fu_driver">
+                  ${db.accounting.drivers.map(d=>`<option value="${d.id}">${d.name}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-3">
+                <label>لترات</label>
+                <input id="fu_liters" type="number" step="0.01" value="0"/>
+              </div>
+              <div class="col-3">
+                <label>الكلفة (دينار)</label>
+                <input id="fu_cost" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-6">
+                <label>ملاحظة</label>
+                <input id="fu_note" placeholder="اختياري"/>
+              </div>
+              <div class="col-12">
+                <button class="btn ok" id="btnAddFuel">حفظ الوقود</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <h3>سجل الأعطال/الصيانة</h3>
+            <div class="form">
+              <div class="col-3">
+                <label>التاريخ</label>
+                <input id="mt_date" type="date" value="${todayISO()}"/>
+              </div>
+              <div class="col-5">
+                <label>الآلية</label>
+                <select id="mt_vehicle">
+                  ${db.accounting.vehicles.map(v=>`<option value="${v.id}">${v.name}${v.plate?` — ${v.plate}`:""}</option>`).join("")}
+                </select>
+              </div>
+              <div class="col-4">
+                <label>الكلفة (دينار)</label>
+                <input id="mt_cost" type="number" step="1" value="0"/>
+              </div>
+              <div class="col-12">
+                <label>العطل/الصيانة</label>
+                <input id="mt_issue" placeholder="مثال: تبديل زيت/تصليح كفر..."/>
+              </div>
+              <div class="col-12">
+                <label>ملاحظة</label>
+                <input id="mt_note" placeholder="اختياري"/>
+              </div>
+              <div class="col-12">
+                <button class="btn ok" id="btnAddMaint">حفظ الصيانة</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+            <div class="grid">
+              <div class="card" style="grid-column:span 6">
+                <h3>آخر الوقود</h3>
+                <div style="overflow:auto">
+                  <table>
+                    <thead><tr><th>تاريخ</th><th>آلية</th><th>سائق</th><th>لترات</th><th>كلفة</th><th></th></tr></thead>
+                    <tbody id="fuelTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card" style="grid-column:span 6">
+                <h3>آخر الصيانة</h3>
+                <div style="overflow:auto">
+                  <table>
+                    <thead><tr><th>تاريخ</th><th>آلية</th><th>كلفة</th><th>عطل</th><th></th></tr></thead>
+                    <tbody id="maintTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderFleetTables(){
+    $("fuelTbody").innerHTML = [...db.accounting.fuelLogs].slice(-25).reverse().map(f=>`
+      <tr>
+        <td>${f.date||""}</td>
+        <td>${getVehicleName(f.vehicleId)}</td>
+        <td>${getDriverName(f.driverId)}</td>
+        <td>${fmt(f.liters||0)}</td>
+        <td>${fmt(f.cost||0)}</td>
+        <td><button class="btn bad" onclick="window.__delFuel('${f.id}')">حذف</button></td>
+      </tr>
+    `).join("") || `<tr><td colspan="6" class="muted">لا يوجد سجلات.</td></tr>`;
+
+    $("maintTbody").innerHTML = [...db.accounting.maintenanceLogs].slice(-25).reverse().map(m=>`
+      <tr>
+        <td>${m.date||""}</td>
+        <td>${getVehicleName(m.vehicleId)}</td>
+        <td>${fmt(m.cost||0)}</td>
+        <td>${m.issue||""}</td>
+        <td><button class="btn bad" onclick="window.__delMaint('${m.id}')">حذف</button></td>
+      </tr>
+    `).join("") || `<tr><td colspan="5" class="muted">لا يوجد سجلات.</td></tr>`;
+  }
+
+  // -----------------------------
+  // Settings View
+  // -----------------------------
+  function settingsView(){
+    return `
+      <div class="card">
+        <h3>الإعدادات</h3>
+        <div class="grid">
+          <div class="card" style="grid-column:span 6">
+            <h3>تغيير كلمة المرور</h3>
+            <label>كلمة المرور الجديدة</label>
+            <input id="newPass" type="password" placeholder="اكتب كلمة جديدة"/>
+            <div class="hr"></div>
+            <button class="btn ok" id="btnSetPass">حفظ</button>
+            <div class="hr"></div>
+            <div class="muted small">ملاحظة: هذا النظام يعمل محلياً (LocalStorage) + تصدير/استيراد.</div>
+          </div>
+          <div class="card" style="grid-column:span 6">
+            <h3>إدارة البيانات</h3>
+            <div class="right">
+              <button class="btn" id="btnBackup2">تصدير نسخة JSON</button>
+              <button class="btn" id="btnRestore2">استيراد JSON</button>
+              <button class="btn" id="btnCSV2">تصدير CSV</button>
+              <button class="btn bad" id="btnWipe">مسح البيانات</button>
+            </div>
+            <div class="hr"></div>
+            <div class="muted small">نصيحة: خزن ملف JSON على جهازك/Google Drive.</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // -----------------------------
+  // Render & Events
+  // -----------------------------
+  function render(){
+    renderNav();
+    const app = $("app");
+    if(currentTab==="home") app.innerHTML = homeView();
+    if(currentTab==="warehouse") app.innerHTML = warehouseView();
+    if(currentTab==="purchasing") app.innerHTML = purchasingView();
+    if(currentTab==="accounting") app.innerHTML = accountingView();
+    if(currentTab==="payroll") app.innerHTML = payrollView();
+    if(currentTab==="fleet") app.innerHTML = fleetView();
+    if(currentTab==="settings") app.innerHTML = settingsView();
+
+    wireTabEvents();
+  }
+
+  function wireTabEvents(){
+    // Global shortcuts
+    window.__nav = (t)=>{ currentTab=t; render(); };
+
+    // Warehouse events
+    if(currentTab==="warehouse"){
+      $("btnAddItem").onclick = () => {
+        const it = {
+          id: uid(),
+          code: $("it_code").value.trim(),
+          name: $("it_name").value.trim(),
+          categoryId: $("it_cat").value,
+          unit: $("it_unit").value.trim(),
+          minQty: Number($("it_min").value||0),
+          note: $("it_note").value.trim()
+        };
+        if(!it.name){ toast("اسم الصنف مطلوب"); return; }
+        db.warehouse.items.push(it);
+        saveDB();
+        toast("تمت إضافة الصنف");
+        render();
+      };
+
+      $("btnAddCat").onclick = () => {
+        const name = $("cat_name").value.trim();
+        if(!name){ toast("اسم التصنيف مطلوب"); return; }
+        db.warehouse.categories.push({id:"cat_"+uid(), name});
+        saveDB();
+        toast("تمت إضافة التصنيف");
+        render();
+      };
+
+      $("btnAddTx").onclick = () => {
+        if(db.warehouse.items.length===0){ toast("أضف صنف أولاً"); return; }
+        const tx = {
+          id: uid(),
+          date: $("tx_date").value || todayISO(),
+          type: $("tx_type").value,
+          itemId: $("tx_item").value,
+          qty: Number($("tx_qty").value||0),
+          unitCost: Number($("tx_cost").value||0),
+          refType:"",
+          refId:"",
+          note: $("tx_note").value.trim()
+        };
+        if(!tx.qty || tx.qty===0){ toast("الكمية مطلوبة"); return; }
+        if(tx.type==="OUT" && stockOf(tx.itemId) < tx.qty){
+          toast("تنبيه: الصرف أكبر من المتوفر");
+        }
+        db.warehouse.tx.push(tx);
+        saveDB();
+        toast("تم تسجيل الحركة");
+        renderWarehouseTables();
+        renderNav();
+      };
+
+      $("it_search").oninput = renderWarehouseTables;
+      $("it_filter_cat").onchange = renderWarehouseTables;
+
+      window.__delTx = (id)=>{
+        db.warehouse.tx = db.warehouse.tx.filter(x=>x.id!==id);
+        saveDB(); toast("تم الحذف"); renderWarehouseTables(); renderNav();
+      };
+      window.__delItem = (id)=>{
+        // prevent delete if has tx
+        if(db.warehouse.tx.some(t=>t.itemId===id)){
+          toast("لا يمكن حذف صنف له حركات. احذف الحركات أولاً.");
+          return;
+        }
+        db.warehouse.items = db.warehouse.items.filter(x=>x.id!==id);
+        saveDB(); toast("تم حذف الصنف"); render();
+      };
+      window.__editItem = (id)=>{
+        const it = getItem(id);
+        if(!it) return;
+        const name = prompt("اسم الصنف:", it.name||"");
+        if(name===null) return;
+        it.name = name.trim() || it.name;
+        const min = prompt("الحد الأدنى:", String(it.minQty||0));
+        if(min!==null) it.minQty = Number(min||0);
+        saveDB(); toast("تم التعديل"); renderWarehouseTables(); renderNav();
+      };
+
+      renderWarehouseTables();
+    }
+
+    // Purchasing events
+    if(currentTab==="purchasing"){
+      if(db.purchasing.suppliers.length===0){
+        // if no suppliers, keep dropdown empty
+      }
+
+      $("btnAddSup").onclick = ()=>{
+        const name = $("sup_name").value.trim();
+        if(!name){ toast("اسم المورد مطلوب"); return; }
+        db.purchasing.suppliers.push({
+          id: uid(),
+          name,
+          phone: $("sup_phone").value.trim(),
+          note: $("sup_note").value.trim()
+        });
+        saveDB();
+        toast("تمت إضافة المورد");
+        render();
+      };
+
+      tmpInvLines = [];
+      window.__rmInvLine = (idx)=>{ tmpInvLines.splice(idx,1); renderInvoiceLines(); };
+
+      $("btnAddInvLine").onclick = ()=>{
+        if(db.warehouse.items.length===0){ toast("أضف أصناف للمخزن أولاً"); return; }
+        const itemId = $("inv_item").value;
+        const qty = Number($("inv_qty").value||0);
+        const unitCost = Number($("inv_cost").value||0);
+        if(!qty || qty<=0){ toast("الكمية مطلوبة"); return; }
+        tmpInvLines.push({itemId, qty, unitCost});
+        renderInvoiceLines();
+      };
+
+      $("btnSaveInvoice").onclick = ()=>{
+        if(db.purchasing.suppliers.length===0){ toast("أضف مورد أولاً"); return; }
+        if(tmpInvLines.length===0){ toast("أضف سطور للفاتورة"); return; }
+        const inv = {
+          id: uid(),
+          date: $("inv_date").value || todayISO(),
+          supplierId: $("inv_supplier").value,
+          items: tmpInvLines.map(x=>({itemId:x.itemId, qty:Number(x.qty||0), unitCost:Number(x.unitCost||0)})),
+          note: $("inv_note").value.trim(),
+          paid: Number($("inv_paid").value||0)
+        };
+        db.purchasing.invoices.push(inv);
+
+        // 1) Add warehouse IN tx for each line
+        for(const l of inv.items){
+          db.warehouse.tx.push({
+            id: uid(),
+            date: inv.date,
+            type:"IN",
+            itemId: l.itemId,
+            qty: l.qty,
+            unitCost: l.unitCost,
+            refType:"INVOICE",
+            refId: inv.id,
+            note: `شراء خارجي — ${getSupplierName(inv.supplierId)}`
+          });
+        }
+
+        // 2) Accounting journal: expense not specified, so we book as "SUPPLIER_PURCHASE"
+        // Here we simplify: debit = total as expense/out, credit = (if cash paid) as CASH_OUT, and remaining as supplier due.
+        const total = inv.items.reduce((a,it)=>a + it.qty*it.unitCost, 0);
+        const paid = Math.min(total, Number(inv.paid||0));
+        const due = Math.max(0, total - paid);
+
+        // record cash out for paid
+        if(paid>0){
+          db.accounting.journal.push({
+            id: uid(), date: inv.date,
+            kind:"CASH_OUT",
+            partyType:"supplier", partyId: inv.supplierId,
+            debit: paid, credit: 0,
+            note: "دفع من الصندوق على فاتورة شراء",
+            refType:"INVOICE", refId: inv.id
+          });
+        }
+        // record supplier due (credit)
+        if(due>0){
+          db.accounting.journal.push({
+            id: uid(), date: inv.date,
+            kind:"SUPPLIER_DUE",
+            partyType:"supplier", partyId: inv.supplierId,
+            debit: 0, credit: due,
+            note: "متبقي للمورد (ذمة) على فاتورة شراء",
+            refType:"INVOICE", refId: inv.id
+          });
+        }
+        // record purchase expense (debit)
+        db.accounting.journal.push({
+          id: uid(), date: inv.date,
+          kind:"PURCHASE",
+          partyType:"supplier", partyId: inv.supplierId,
+          debit: total, credit: 0,
+          note: "شراء مواد خارجية (تكلفة)",
+          refType:"INVOICE", refId: inv.id
+        });
+
+        saveDB();
+        toast("تم حفظ الفاتورة وتسجيل المخزن/المحاسبة");
+        tmpInvLines = [];
+        render();
+      };
+
+      window.__delInvoice = (id)=>{
+        // delete invoice + linked warehouse tx + linked journal
+        db.purchasing.invoices = db.purchasing.invoices.filter(x=>x.id!==id);
+        db.warehouse.tx = db.warehouse.tx.filter(t=>!(t.refType==="INVOICE" && t.refId===id));
+        db.accounting.journal = db.accounting.journal.filter(j=>!(j.refType==="INVOICE" && j.refId===id));
+        saveDB(); toast("تم حذف الفاتورة"); render();
+      };
+
+      renderInvoiceLines();
+      renderInvoicesTable();
+    }
+
+    // Accounting events
+    if(currentTab==="accounting"){
+      renderPartyDropdown();
+      $("j_partyType").onchange = renderPartyDropdown;
+
+      $("btnAddCon").onclick = ()=>{
+        const name = $("con_name").value.trim();
+        if(!name){ toast("اسم المقاول مطلوب"); return; }
+        db.accounting.contractors.push({id: uid(), name, phone:$("con_phone").value.trim(), note:""});
+        saveDB(); toast("تمت إضافة المقاول"); render();
+      };
+
+      $("btnAddEmp").onclick = ()=>{
+        const name = $("emp_name").value.trim();
+        if(!name){ toast("اسم الموظف مطلوب"); return; }
+        db.accounting.employees.push({
+          id: uid(),
+          name,
+          role: $("emp_role").value.trim(),
+          phone:"",
+          salary: Number($("emp_salary").value||0)
+        });
+        saveDB(); toast("تمت إضافة الموظف"); render();
+      };
+
+      $("btnAddJournal").onclick = ()=>{
+        const date = $("j_date").value || todayISO();
+        const kind = $("j_kind").value;
+        const partyType = $("j_partyType").value || "";
+        const partyId = $("j_partyId").value || "";
+        const amount = Number($("j_amount").value||0);
+        const note = $("j_note").value.trim();
+
+        if(!amount || amount<=0){ toast("المبلغ مطلوب"); return; }
+
+        // For simplicity:
+        // - CASH_IN => credit
+        // - Others => debit
+        const isCashIn = kind==="CASH_IN";
+        const j = {
+          id: uid(), date, kind, partyType, partyId,
+          debit: isCashIn ? 0 : amount,
+          credit: isCashIn ? amount : 0,
+          note,
+          refType:"", refId:""
+        };
+        db.accounting.journal.push(j);
+        saveDB();
+        toast("تم حفظ القيد");
+        renderJournalTable();
+        renderNav();
+      };
+
+      window.__delJ = (id)=>{
+        db.accounting.journal = db.accounting.journal.filter(x=>x.id!==id);
+        saveDB(); toast("تم الحذف"); renderJournalTable(); renderNav();
+      };
+
+      renderJournalTable();
+    }
+
+    // Payroll events
+    if(currentTab==="payroll"){
+      $("btnAddPayroll").onclick = ()=>{
+        if(db.accounting.employees.length===0){ toast("أضف موظفين أولاً"); return; }
+        const employeeId = $("pr_emp").value;
+        const month = $("pr_month").value || todayISO().slice(0,7);
+        const date = $("pr_date").value || todayISO();
+        const base = Number($("pr_base").value||0) || (db.accounting.employees.find(e=>e.id===employeeId)?.salary||0);
+        const bonus = Number($("pr_bonus").value||0);
+        const deduction = Number($("pr_ded").value||0);
+        const note = $("pr_note").value.trim();
+        const net = base + bonus - deduction;
+
+        const p = {id: uid(), month, date, employeeId, base, bonus, deduction, paid: net, note};
+        db.accounting.payroll.push(p);
+
+        // accounting cash out
+        if(net>0){
+          db.accounting.journal.push({
+            id: uid(), date,
+            kind:"SALARY_PAY",
+            partyType:"employee", partyId: employeeId,
+            debit: net, credit: 0,
+            note: `دفع راتب شهر ${month}`,
+            refType:"PAYROLL", refId: p.id
+          });
+        }
+
+        saveDB(); toast("تم حفظ مسير الراتب"); renderPayrollTable(); renderNav();
+      };
+
+      window.__delPayroll = (id)=>{
+        db.accounting.payroll = db.accounting.payroll.filter(x=>x.id!==id);
+        db.accounting.journal = db.accounting.journal.filter(j=>!(j.refType==="PAYROLL" && j.refId===id));
+        saveDB(); toast("تم الحذف"); render();
+      };
+
+      renderPayrollTable();
+    }
+
+    // Fleet events
+    if(currentTab==="fleet"){
+      $("btnAddVh").onclick = ()=>{
+        const name = $("vh_name").value.trim();
+        if(!name){ toast("اسم الآلية مطلوب"); return; }
+        db.accounting.vehicles.push({id: uid(), name, plate:$("vh_plate").value.trim(), note:""});
+        saveDB(); toast("تمت إضافة الآلية"); render();
+      };
+      $("btnAddDr").onclick = ()=>{
+        const name = $("dr_name").value.trim();
+        if(!name){ toast("اسم السائق مطلوب"); return; }
+        db.accounting.drivers.push({id: uid(), name, phone:$("dr_phone").value.trim(), note:""});
+        saveDB(); toast("تمت إضافة السائق"); render();
+      };
+
+      $("btnAddFuel").onclick = ()=>{
+        if(db.accounting.vehicles.length===0){ toast("أضف آلية أولاً"); return; }
+        const f = {
+          id: uid(),
+          date: $("fu_date").value || todayISO(),
+          vehicleId: $("fu_vehicle").value,
+          driverId: $("fu_driver").value,
+          liters: Number($("fu_liters").value||0),
+          cost: Number($("fu_cost").value||0),
+          note: $("fu_note").value.trim()
+        };
+        if(!f.cost || f.cost<=0){ toast("الكلفة مطلوبة"); return; }
+        db.accounting.fuelLogs.push(f);
+
+        // accounting expense
+        db.accounting.journal.push({
+          id: uid(), date: f.date,
+          kind:"FUEL",
+          partyType:"", partyId:"",
+          debit: f.cost, credit: 0,
+          note: `وقود — ${getVehicleName(f.vehicleId)} / ${getDriverName(f.driverId)} (${fmt(f.liters)} لتر)`,
+          refType:"FUEL", refId: f.id
+        });
+
+        saveDB(); toast("تم حفظ الوقود"); renderFleetTables(); renderNav();
+      };
+
+      $("btnAddMaint").onclick = ()=>{
+        if(db.accounting.vehicles.length===0){ toast("أضف آلية أولاً"); return; }
+        const m = {
+          id: uid(),
+          date: $("mt_date").value || todayISO(),
+          vehicleId: $("mt_vehicle").value,
+          cost: Number($("mt_cost").value||0),
+          issue: $("mt_issue").value.trim(),
+          note: $("mt_note").value.trim()
+        };
+        if(!m.cost || m.cost<=0){ toast("الكلفة مطلوبة"); return; }
+        if(!m.issue){ toast("وصف العطل/الصيانة مطلوب"); return; }
+        db.accounting.maintenanceLogs.push(m);
+
+        db.accounting.journal.push({
+          id: uid(), date: m.date,
+          kind:"MAINTENANCE",
+          partyType:"", partyId:"",
+          debit: m.cost, credit: 0,
+          note: `صيانة — ${getVehicleName(m.vehicleId)} (${m.issue})`,
+          refType:"MAINT", refId: m.id
+        });
+
+        saveDB(); toast("تم حفظ الصيانة"); renderFleetTables(); renderNav();
+      };
+
+      window.__delFuel = (id)=>{
+        db.accounting.fuelLogs = db.accounting.fuelLogs.filter(x=>x.id!==id);
+        db.accounting.journal = db.accounting.journal.filter(j=>!(j.refType==="FUEL" && j.refId===id));
+        saveDB(); toast("تم الحذف"); renderFleetTables(); renderNav();
+      };
+      window.__delMaint = (id)=>{
+        db.accounting.maintenanceLogs = db.accounting.maintenanceLogs.filter(x=>x.id!==id);
+        db.accounting.journal = db.accounting.journal.filter(j=>!(j.refType==="MAINT" && j.refId===id));
+        saveDB(); toast("تم الحذف"); renderFleetTables(); renderNav();
+      };
+
+      renderFleetTables();
+    }
+
+    // Settings events
+    if(currentTab==="settings"){
+      $("btnSetPass").onclick = ()=>{
+        const p = $("newPass").value;
+        if(!p || p.length<4){ toast("كلمة المرور قصيرة"); return; }
+        localStorage.setItem(PASS_KEY, p);
+        toast("تم حفظ كلمة المرور");
+        $("newPass").value = "";
+      };
+
+      $("btnBackup2").onclick = $("btnBackup").onclick;
+      $("btnRestore2").onclick = $("btnRestore").onclick;
+      $("btnCSV2").onclick = $("btnCSV").onclick;
+
+      $("btnWipe").onclick = ()=>{
+        if(confirm("هل أنت متأكد من مسح كل البيانات المحلية؟")){
+          localStorage.removeItem(DB_KEY);
+          db = defaultDB();
+          saveDB();
+          toast("تم مسح البيانات");
+          render();
+        }
+      };
+    }
+  }
+
+  // -----------------------------
+  // Topbar buttons
+  // -----------------------------
+  $("btnLock").onclick = lock;
+
+  $("btnBackup").onclick = ()=>{
+    dl("majma-adl-backup.json", JSON.stringify(db,null,2), "application/json;charset=utf-8");
+    toast("تم تصدير JSON");
+  };
+  $("btnRestore").onclick = ()=>{
+    const inp = document.createElement("input");
+    inp.type="file"; inp.accept=".json,application/json";
+    inp.onchange = async ()=>{
+      const f = inp.files?.[0]; if(!f) return;
+      const text = await f.text();
+      try{
+        const obj = JSON.parse(text);
+        // basic validation
+        if(!obj.warehouse || !obj.accounting){ toast("ملف غير صالح"); return; }
+        db = obj;
+        saveDB();
+        toast("تم الاستيراد");
+        render();
+      }catch(e){
+        toast("فشل قراءة الملف");
+      }
+    };
+    inp.click();
+  };
+
+  $("btnCSV").onclick = exportAllCSV;
+
+  // share with Settings view
+  $("btnBackup2") && ($("btnBackup2").onclick = $("btnBackup").onclick);
+
+  // -----------------------------
+  // Login flow
+  // -----------------------------
+  $("btnLogin").onclick = ()=>{
+    const p = $("loginPass").value;
+    if(p === getPass()){
+      sessionStorage.setItem(AUTH_KEY,"1");
+      showLogin(false);
+      render();
+      toast("تم تسجيل الدخول");
+    }else{
+      toast("كلمة المرور غير صحيحة");
+    }
+  };
+
+  // initial
+  if(!isAuthed()){
+    showLogin(true);
+  }else{
+    showLogin(false);
+    render();
+  }
+})();
+</script>
 </body>
 </html>
