@@ -1,1007 +1,759 @@
-/* مجمع العدل السكني - تطبيق إدارة (Static/PWA) - حفظ محلي + تصدير Excel/CSV */
+/* app.js — Majma Al-Adl Dashboard (Pages) + Cloudflare Workers API + D1 */
+
 (() => {
-  const $ = (id) => document.getElementById(id);
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
-  // -----------------------
-  // Auth (online + roles)
-  // -----------------------
-  const AUTH_OK_KEY    = "majma_adl_auth_ok";
-  const AUTH_USER_KEY  = "majma_adl_auth_user";
-  const AUTH_TOKEN_KEY = "majma_adl_auth_token";
-  const AUTH_ROLE_KEY  = "majma_adl_auth_role"; // admin | engineer
+  // -------------------------
+  // Config / Auth (simple)
+  // -------------------------
+  const AUTH_OK = "majma_adl_auth_ok";
+  const AUTH_USER = "majma_adl_user";
+  const AUTH_PASS = "majma_adl_pass";
+  const DEFAULT_USER = "admin";
+  const DEFAULT_PASS = "@1000@";
 
-  // Local fallback users (offline)
-  const DEFAULT_ADMIN_USER = "admin";
-  const DEFAULT_ADMIN_PASS = "@1000@";
+  function getSavedUser() { return localStorage.getItem(AUTH_USER) || DEFAULT_USER; }
+  function getSavedPass() { return localStorage.getItem(AUTH_PASS) || DEFAULT_PASS; }
+  function isAuthed() { return sessionStorage.getItem(AUTH_OK) === "1"; }
+  function setAuthed() { sessionStorage.setItem(AUTH_OK, "1"); }
+  function lock() { sessionStorage.removeItem(AUTH_OK); location.reload(); }
 
-  const ENGINEER_USER = "eng";
-  const ENGINEER_PASS = "11335577";
-
-  function getToken(){ return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
-  function setToken(t){
-    if(t) localStorage.setItem(AUTH_TOKEN_KEY, t);
-    else localStorage.removeItem(AUTH_TOKEN_KEY);
+  // -------------------------
+  // API base + helpers
+  // -------------------------
+  const API_OVERRIDE_KEY = "majma_adl_api_override";
+  const DEFAULT_API = ""; // إذا خليته فارغ => يحاول يتوقع /api من نفس الدومين (إذا عندك بروكسي). وإلا استخدم override.
+  function apiBase() {
+    const o = (localStorage.getItem(API_OVERRIDE_KEY) || "").trim();
+    return o || DEFAULT_API;
   }
-  function setRole(role){
-    sessionStorage.setItem(AUTH_ROLE_KEY, role || "admin");
-  }
-  function getRole(){
-    return sessionStorage.getItem(AUTH_ROLE_KEY) || "admin";
-  }
-  function isAuthed(){
-    return sessionStorage.getItem(AUTH_OK_KEY) === "1" && !!getToken();
-  }
-  function currentUser(){ return sessionStorage.getItem(AUTH_USER_KEY) || ""; }
-
-  function lock(){
-    sessionStorage.removeItem(AUTH_OK_KEY);
-    sessionStorage.removeItem(AUTH_USER_KEY);
-    sessionStorage.removeItem(AUTH_ROLE_KEY);
-    setToken("");
-    location.reload();
+  function setApiBase(url) {
+    localStorage.setItem(API_OVERRIDE_KEY, (url || "").trim());
   }
 
-  function showLogin(show){
-    const back = $("loginBack");
-    if(!back) return;
-    back.classList.toggle("hidden", !show);
-  }
-
-  function roleFromUsername(u){
-    if(String(u).toLowerCase() === ENGINEER_USER.toLowerCase()) return "engineer";
-    return "admin";
-  }
-
-  // -----------------------
-  // API Base (Workers) + Status
-  // -----------------------
-  const API_OVERRIDE_KEY = "majma_adl_api_base_override";
-
-  function getApiBase(){
-    const ov = (localStorage.getItem(API_OVERRIDE_KEY) || "").trim();
-    // لو فارغ => يستخدم نفس الدومين (./api/...)
-    return ov || "";
-  }
-
-  function apiUrl(path){
-    // path مثل "/api/db" أو "./api/db"
-    const p = String(path || "").replace(/^\.\//, "/").replace(/^\/?/, "/");
-    const base = getApiBase();
-    if(!base) return "." + p; // نفس الموقع
-    return base.replace(/\/+$/,"") + p;
-  }
-
-  async function apiFetch(path, opts={}){
-    const headers = Object.assign({"Content-Type":"application/json"}, opts.headers||{});
-    const t = getToken();
-    if(t && t !== "OFFLINE") headers["Authorization"] = "Bearer " + t;
-    return await fetch(apiUrl(path), Object.assign({}, opts, {headers}));
-  }
-
-  async function pingServer(){
-    const pill = $("apiStatus");
-    const baseEl = $("apiBase");
-
-    const base = getApiBase();
-    if(baseEl) baseEl.textContent = base ? base : "(نفس الموقع)";
-
-    const t = getToken();
-    if(!pill) return;
-
-    if(!t || t === "OFFLINE"){
-      pill.textContent = "محلي (OFFLINE)";
-      pill.style.opacity = "1";
-      return;
+  async function apiFetch(path, opt = {}) {
+    const base = apiBase();
+    const url = base ? (base.replace(/\/+$/, "") + path) : path; // يسمح بوضع /api لو عندك proxy
+    const headers = Object.assign({ "Content-Type": "application/json" }, opt.headers || {});
+    const res = await fetch(url, { ...opt, headers });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+    if (!res.ok) {
+      const msg = (data && (data.error || data.message)) ? (data.error || data.message) : `API Error ${res.status}`;
+      throw new Error(msg);
     }
-
-    try{
-      // جرّب مسار بسيط - إذا ما عندك هذا بالـ Worker راح يفشل ويظل غير متصل
-      const res = await apiFetch("/api/health", {method:"GET"});
-      if(res.ok){
-        pill.textContent = "متصل";
-        pill.style.opacity = "1";
-        return;
-      }
-    }catch{}
-
-    pill.textContent = "غير متصل";
-    pill.style.opacity = "1";
+    return data;
   }
 
-  async function tryLogin(username, password){
-    const uNorm = String(username||"").trim();
-    const pNorm = String(password||"");
-
-    // Try online login first
-    try{
-      const res = await fetch(apiUrl("/api/auth/login"), {
-        method:"POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({username: uNorm, password: pNorm})
-      });
-
-      if(res.ok){
-        const data = await res.json();
-        if(data && data.token){
-          setToken(data.token);
-          sessionStorage.setItem(AUTH_OK_KEY, "1");
-          sessionStorage.setItem(AUTH_USER_KEY, data.username || uNorm);
-          setRole(data.role || roleFromUsername(data.username || uNorm));
-          return true;
-        }
-      }
-    }catch{}
-
-    // Offline fallback
-    if(uNorm === DEFAULT_ADMIN_USER && pNorm === DEFAULT_ADMIN_PASS){
-      setToken("OFFLINE");
-      sessionStorage.setItem(AUTH_OK_KEY, "1");
-      sessionStorage.setItem(AUTH_USER_KEY, uNorm);
-      setRole("admin");
-      return true;
-    }
-
-    if(uNorm === ENGINEER_USER && pNorm === ENGINEER_PASS){
-      setToken("OFFLINE");
-      sessionStorage.setItem(AUTH_OK_KEY, "1");
-      sessionStorage.setItem(AUTH_USER_KEY, uNorm);
-      setRole("engineer");
-      return true;
-    }
-
-    return false;
-  }
-
-  // -----------------------
-  // Storage
-  // -----------------------
-  const DB_KEY = "majma_adl_db_v1";
-  const todayISO = () => new Date().toISOString().slice(0,10);
-  const fmt = new Intl.NumberFormat("ar-IQ");
-
-  function emptyDB(){
-    return {
-      meta: { project: "مجمع العدل السكني", updatedAt: new Date().toISOString() },
-      units: [],
-      inventory_items: [],
-      inventory_moves: [],
-      purchases: [],
-      contractors: [],
-      engineers: [],
-      workers: [],
-      equipment: [],
-      accounts: [],
-      sales: [],
-    };
-  }
-
-  let DB_MEM = null;
-  let pushTimer = null;
-
-  function loadDB(){
-    if(DB_MEM) return DB_MEM;
-    try{
-      const raw = localStorage.getItem(DB_KEY);
-      if(!raw){ DB_MEM = emptyDB(); return DB_MEM; }
-      const d = JSON.parse(raw);
-      DB_MEM = Object.assign(emptyDB(), d || {});
-      return DB_MEM;
-    }catch{
-      DB_MEM = emptyDB();
-      return DB_MEM;
-    }
-  }
-
-  async function syncFromServer(){
-    const t = getToken();
-    if(!t || t==="OFFLINE") return false;
-    try{
-      const res = await apiFetch("/api/db", {method:"GET"});
-      if(res.status===401){ lock(); return false; }
-      if(!res.ok) return false;
-      const data = await res.json();
-      if(data && typeof data==="object"){
-        DB_MEM = Object.assign(emptyDB(), data);
-        localStorage.setItem(DB_KEY, JSON.stringify(DB_MEM));
-        return true;
-      }
-    }catch{}
-    return false;
-  }
-
-  function schedulePush(){
-    const t = getToken();
-    if(!t || t==="OFFLINE") return;
-    if(pushTimer) clearTimeout(pushTimer);
-    pushTimer = setTimeout(async ()=>{
-      try{
-        const db = loadDB();
-        await apiFetch("/api/db", {method:"PUT", body: JSON.stringify(db)});
-      }catch{}
-    }, 700);
-  }
-
-  function saveDB(db){
-    db.meta.updatedAt = new Date().toISOString();
-    DB_MEM = db;
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-    schedulePush();
-  }
-
-  function uid(){
-    return Math.floor(Date.now() + Math.random()*1000000);
-  }
-
-  // CSV helpers
-  const esc = (v) => {
-    const s = (v===null || v===undefined) ? "" : String(v);
-    if(/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
-    return s;
-  };
-  function toCSV(rows, headers){
-    const head = headers.map(h=>esc(h.label)).join(",");
-    const body = rows.map(r => headers.map(h=>esc(r[h.key])).join(",")).join("\n");
-    return head + "\n" + body;
-  }
-  function downloadText(filename, text, mime="text/plain;charset=utf-8"){
-    const blob = new Blob([text], {type:mime});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-  }
-  function downloadExcelHtml(filename, title, headers, rows){
-    const html = `<!doctype html><html><head><meta charset="utf-8"></head><body>
-      <table border="1">
-        <tr><th colspan="${headers.length}" style="font-size:16px">${title}</th></tr>
-        <tr>${headers.map(h=>`<th>${String(h.label)}</th>`).join("")}</tr>
-        ${rows.map(r=>`<tr>${headers.map(h=>`<td>${String(r[h.key] ?? "")}</td>`).join("")}</tr>`).join("")}
-      </table>
-    </body></html>`;
-    downloadText(filename, html, "application/vnd.ms-excel;charset=utf-8");
-  }
-
-  function parseCSV(text){
-    const rows = [];
-    let i=0, cur="", inQ=false, row=[];
-    while(i<text.length){
-      const ch = text[i];
-      if(inQ){
-        if(ch === '"'){
-          if(text[i+1] === '"'){ cur+='"'; i+=2; continue; }
-          inQ=false; i++; continue;
-        }
-        cur+=ch; i++; continue;
-      }else{
-        if(ch === '"'){ inQ=true; i++; continue; }
-        if(ch === ','){ row.push(cur); cur=""; i++; continue; }
-        if(ch === '\n'){ row.push(cur); rows.push(row); row=[]; cur=""; i++; continue; }
-        if(ch === '\r'){ i++; continue; }
-        cur+=ch; i++; continue;
-      }
-    }
-    row.push(cur);
-    rows.push(row);
-    return rows;
-  }
-
-  async function readFileText(file){
-    return await new Promise((res, rej)=>{
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result||""));
-      fr.onerror = rej;
-      fr.readAsText(file, "utf-8");
-    });
-  }
-
-  // -----------------------
-  // Backup / Restore (JSON)
-  // -----------------------
-  function exportBackupJSON(){
-    const db = loadDB();
-    const fname = `majma_adl_backup_${todayISO()}.json`;
-    downloadText(fname, JSON.stringify(db, null, 2), "application/json;charset=utf-8");
-  }
-
-  async function importBackupJSON(file){
-    const text = await readFileText(file);
-    try{
-      const obj = JSON.parse(text);
-      const merged = Object.assign(emptyDB(), obj || {});
-      localStorage.setItem(DB_KEY, JSON.stringify(merged));
-      DB_MEM = merged;
-      alert("✅ تم الاستيراد بنجاح.");
-      renderAll();
-    }catch{
-      alert("❌ ملف JSON غير صالح.");
-    }
-  }
-
-  // -----------------------
-  // UI Shell + Role Guard
-  // -----------------------
-  const nav = $("nav");
-  const pageTitle = $("pageTitle");
-
-  function canAccess(pageKey){
-    const role = getRole();
-    if(role === "engineer"){
-      return pageKey === "engineers"; // المهندس يشوف المهندسون فقط
-    }
-    return true; // admin يشوف الكل
-  }
-
-  function applyRoleUI(){
-    const role = getRole();
-
-    // اخفاء عناصر القائمة حسب الدور
-    document.querySelectorAll(".nav__item").forEach(btn=>{
-      const k = btn.dataset.page;
-      btn.style.display = canAccess(k) ? "" : "none";
-    });
-
-    // زر seed فقط للادمن
-    if($("seedBtn")){
-      $("seedBtn").style.display = (role === "admin") ? "" : "none";
-    }
-  }
-
-  function showPage(key){
-    if(!canAccess(key)){
-      key = "engineers";
-    }
-
-    document.querySelectorAll(".nav__item").forEach(b=>b.classList.remove("active"));
-    document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));
-
-    document.querySelector(`[data-page="${key}"]`)?.classList.add("active");
-    $("page-"+key)?.classList.remove("hidden");
-
-    const titles={
-      dashboard:"الرئيسية",
-      units:"الوحدات السكنية",
-      inventory:"المخزن",
-      purchases:"المشتريات",
-      contractors:"المقاولون",
-      engineers:"المهندسون",
-      workers:"العمال",
-      equipment:"المعدات",
-      accounts:"الحسابات",
-      sales:"المبيعات",
-      reports:"التقارير",
-      settings:"الإعدادات",
-    };
-    if(pageTitle) pageTitle.textContent = titles[key] || "الرئيسية";
-    renderPage(key);
-  }
-
-  nav?.addEventListener("click",(e)=>{
-    const btn = e.target.closest(".nav__item");
-    if(!btn) return;
-    showPage(btn.dataset.page);
-  });
-
-  // -----------------------
-  // Modules (generic CRUD)
-  // -----------------------
-  const Modules = {
-    units: {
-      title: "الوحدات السكنية",
-      store: "units",
-      help: "إدارة الوحدات (منجزة/قيد التنفيذ/غير بادئة) + نسبة الإنجاز + ملاحظات.",
-      fields: [
-        {key:"رقم_الوحدة", label:"رقم الوحدة", type:"text", required:true},
-        {key:"البلوك", label:"البلوك", type:"text"},
-        {key:"الحالة", label:"الحالة", type:"select", options:["غير بادئة","قيد التنفيذ","مكتملة","موقوف"]},
-        {key:"نسبة_الانجاز", label:"نسبة الإنجاز %", type:"number", min:0, max:100, step:0.1},
-        {key:"المقاول", label:"المقاول", type:"text"},
-        {key:"المهندس", label:"المهندس", type:"text"},
-        {key:"تاريخ_البدء", label:"تاريخ البدء", type:"date"},
-        {key:"تاريخ_الانجاز", label:"تاريخ الإنجاز", type:"date"},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({الحالة:"غير بادئة", نسبة_الانجاز:0}),
-      seed: (db) => {
-        if(db.units.length) return;
-        for(let i=1;i<=500;i++){
-          db.units.push({id:uid(), رقم_الوحدة:String(i).padStart(3,"0"), البلوك:"A", الحالة:"غير بادئة", نسبة_الانجاز:0});
-        }
-      }
+  const api = {
+    ping: () => apiFetch("/ping"),
+    // Units
+    units_list: (q = {}) => {
+      const params = new URLSearchParams();
+      if (q.search) params.set("search", q.search);
+      if (q.block) params.set("block", q.block);
+      return apiFetch("/units?" + params.toString());
     },
+    unit_get: (id) => apiFetch(`/units/${encodeURIComponent(id)}`),
+    unit_create: (payload) => apiFetch("/units", { method: "POST", body: JSON.stringify(payload) }),
+    unit_update: (id, payload) => apiFetch(`/units/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) }),
+    unit_delete: (id) => apiFetch(`/units/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    units_seed: (count = 500) => apiFetch("/seed", { method: "POST", body: JSON.stringify({ count }) }),
 
-    purchases: {
-      title: "المشتريات",
-      store: "purchases",
-      help: "شراء مواد: نقد/آجل + مبالغ مدفوعة/متبقية + تفاصيل.",
-      fields: [
-        {key:"التاريخ", label:"التاريخ", type:"date", required:true},
-        {key:"المورد", label:"المورد", type:"text"},
-        {key:"الفئة", label:"الفئة", type:"select", options:["مواد إنشائية","حصى","طابوق","رمل","سمنت","جص","بورك","أخرى"]},
-        {key:"نوع_الدفع", label:"نوع الدفع", type:"select", options:["نقد","آجل"]},
-        {key:"الإجمالي", label:"الإجمالي", type:"number", step:1},
-        {key:"المدفوع", label:"المدفوع", type:"number", step:1},
-        {key:"المتبقي", label:"المتبقي", type:"number", step:1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({التاريخ: todayISO(), نوع_الدفع:"نقد", الإجمالي:0, المدفوع:0, المتبقي:0}),
-      afterSave: (db, row) => {
-        const paid = Number(row.المدفوع || 0);
-        if(paid > 0){
-          db.accounts.push({id:uid(), التاريخ: row.التاريخ || todayISO(), النوع:"مصروف", الفئة:"مشتريات", الوصف:`مشتريات - ${row.المورد||""}`.trim(), المبلغ: paid});
-        }
-      }
-    },
+    // Contractors / Engineers / Workers
+    contractors_list: () => apiFetch("/contractors"),
+    contractor_create: (p) => apiFetch("/contractors", { method: "POST", body: JSON.stringify(p) }),
+    contractor_update: (id, p) => apiFetch(`/contractors/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(p) }),
+    contractor_delete: (id) => apiFetch(`/contractors/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
-    contractors: {
-      title:"المقاولون",
-      store:"contractors",
-      help:"بيانات المقاولين + سلف/دفعات/تسديد.",
-      fields:[
-        {key:"اسم_المقاول", label:"اسم المقاول", type:"text", required:true},
-        {key:"الهاتف", label:"الهاتف", type:"text"},
-        {key:"نسبة_الانجاز", label:"نسبة الإنجاز %", type:"number", min:0, max:100, step:0.1},
-        {key:"سلفة", label:"سلفة", type:"number", step:1},
-        {key:"مبلغ_متفق", label:"المبلغ المتفق", type:"number", step:1},
-        {key:"المدفوع", label:"المدفوع", type:"number", step:1},
-        {key:"المتبقي", label:"المتبقي", type:"number", step:1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({نسبة_الانجاز:0, سلفة:0, مبلغ_متفق:0, المدفوع:0, المتبقي:0})
-    },
+    engineers_list: () => apiFetch("/engineers"),
+    engineer_create: (p) => apiFetch("/engineers", { method: "POST", body: JSON.stringify(p) }),
+    engineer_update: (id, p) => apiFetch(`/engineers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(p) }),
+    engineer_delete: (id) => apiFetch(`/engineers/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
-    engineers: {
-      title:"المهندسون",
-      store:"engineers",
-      help:"رواتب يومية/أسبوعية/شهرية + مراحل العمل + نسبة الإنجاز.",
-      fields:[
-        {key:"الاسم", label:"الاسم", type:"text", required:true},
-        {key:"الهاتف", label:"الهاتف", type:"text"},
-        {key:"نوع_الراتب", label:"نوع الراتب", type:"select", options:["يومي","أسبوعي","شهري"]},
-        {key:"المبلغ", label:"المبلغ", type:"number", step:1},
-        {key:"نسبة_الانجاز", label:"نسبة الإنجاز %", type:"number", min:0, max:100, step:0.1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({نوع_الراتب:"شهري", المبلغ:0, نسبة_الانجاز:0})
-    },
+    workers_list: () => apiFetch("/workers"),
+    worker_create: (p) => apiFetch("/workers", { method: "POST", body: JSON.stringify(p) }),
+    worker_update: (id, p) => apiFetch(`/workers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(p) }),
+    worker_delete: (id) => apiFetch(`/workers/${encodeURIComponent(id)}`, { method: "DELETE" }),
 
-    workers: {
-      title:"العمال",
-      store:"workers",
-      help:"إدارة العمال + رواتب يومية/أسبوعية/شهرية + خصم.",
-      fields:[
-        {key:"الاسم", label:"الاسم", type:"text", required:true},
-        {key:"الهاتف", label:"الهاتف", type:"text"},
-        {key:"نوع_الراتب", label:"نوع الراتب", type:"select", options:["يومي","أسبوعي","شهري"]},
-        {key:"المبلغ", label:"المبلغ", type:"number", step:1},
-        {key:"خصم", label:"خصم", type:"number", step:1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({نوع_الراتب:"يومي", المبلغ:0, خصم:0})
-    },
-
-    equipment: {
-      title:"المعدات",
-      store:"equipment",
-      help:"الآليات/المعدات + السائق + رواتب + أعطال وتصليح وخصم.",
-      fields:[
-        {key:"اسم_المعدة", label:"اسم المعدة", type:"text", required:true},
-        {key:"النوع", label:"النوع", type:"select", options:["حفارة","قلابة","لودر","رافعة","مولدة","مضخة","أخرى"]},
-        {key:"السائق", label:"السائق", type:"text"},
-        {key:"نوع_الراتب", label:"نوع الراتب", type:"select", options:["يومي","أسبوعي","شهري"]},
-        {key:"راتب_السائق", label:"راتب السائق", type:"number", step:1},
-        {key:"اعطال_وتصليح", label:"أعطال/تصليح", type:"number", step:1},
-        {key:"خصم", label:"خصم", type:"number", step:1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({نوع_الراتب:"شهري", راتب_السائق:0, اعطال_وتصليح:0, خصم:0})
-    },
-
-    accounts: {
-      title:"الحسابات",
-      store:"accounts",
-      help:"الرصيد (إيداع/سحب) + صرف رواتب + تسديد فواتير + نثرية/ضيافة/تعامل خارجي...",
-      fields:[
-        {key:"التاريخ", label:"التاريخ", type:"date", required:true},
-        {key:"النوع", label:"النوع", type:"select", options:["إيداع","سحب","مصروف"]},
-        {key:"الفئة", label:"الفئة", type:"select", options:["رواتب","مقاولين","مشتريات","فواتير","نثرية","ضيافة","تعامل خارجي","أخرى"]},
-        {key:"الوصف", label:"الوصف", type:"text"},
-        {key:"المبلغ", label:"المبلغ", type:"number", step:1},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({التاريخ: todayISO(), النوع:"مصروف", الفئة:"أخرى", المبلغ:0})
-    },
-
-    sales: {
-      title:"المبيعات",
-      store:"sales",
-      help:"إدارة مبيعات الوحدات (محجوزة/مباعة/متاحة) + مبالغ.",
-      fields:[
-        {key:"رقم_الوحدة", label:"رقم الوحدة", type:"text", required:true},
-        {key:"التاريخ", label:"التاريخ", type:"date"},
-        {key:"الحالة", label:"الحالة", type:"select", options:["محجوزة","مباعة","متاحة"]},
-        {key:"السعر", label:"السعر", type:"number", step:1},
-        {key:"المدفوع", label:"المدفوع", type:"number", step:1},
-        {key:"المتبقي", label:"المتبقي", type:"number", step:1},
-        {key:"المشتري", label:"المشتري", type:"text"},
-        {key:"ملاحظات", label:"ملاحظات", type:"textarea"},
-      ],
-      defaultRow: () => ({التاريخ: todayISO(), الحالة:"متاحة", السعر:0, المدفوع:0, المتبقي:0}),
-      afterSave: (db, row) => {
-        const paid = Number(row.المدفوع||0);
-        if(paid>0){
-          db.accounts.push({id:uid(), التاريخ: row.التاريخ || todayISO(), النوع:"إيداع", الفئة:"أخرى", الوصف:`دفعة بيع وحدة ${row.رقم_الوحدة}`, المبلغ: paid});
-        }
-      }
-    },
+    // Unit Workers
+    unit_workers_list: (unitId) => apiFetch(`/units/${encodeURIComponent(unitId)}/workers`),
+    unit_worker_add: (unitId, p) => apiFetch(`/units/${encodeURIComponent(unitId)}/workers`, { method: "POST", body: JSON.stringify(p) }),
+    unit_worker_update: (unitId, id, p) => apiFetch(`/units/${encodeURIComponent(unitId)}/workers/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(p) }),
+    unit_worker_delete: (unitId, id) => apiFetch(`/units/${encodeURIComponent(unitId)}/workers/${encodeURIComponent(id)}`, { method: "DELETE" }),
   };
 
-  function normalizeRow(fields, row){
-    const out = {};
-    fields.forEach(f=>{
-      let v = row[f.key];
-      if(f.type==="number"){
-        v = (v===""||v===null||v===undefined) ? 0 : Number(v);
-        if(Number.isNaN(v)) v = 0;
-      }
-      out[f.key]=v;
+  // -------------------------
+  // UI state
+  // -------------------------
+  let cache = {
+    units: [],
+    contractors: [],
+    engineers: [],
+    workers: [],
+  };
+
+  let selectedUnit = null;
+
+  // -------------------------
+  // DOM refs
+  // -------------------------
+  const els = {
+    loginBack: $("#loginBack"),
+    loginUser: $("#loginUser"),
+    loginPass: $("#loginPass"),
+    loginBtn: $("#loginBtn"),
+
+    nav: $("#nav"),
+    pageTitle: $("#pageTitle"),
+
+    apiStatus: $("#apiStatus"),
+    apiBase: $("#apiBase"),
+
+    seedBtn: $("#seedBtn"),
+
+    // KPI
+    kpiUnits: $("#kpiUnits"),
+    kpiProgress: $("#kpiProgress"),
+    kpiContractors: $("#kpiContractors"),
+    statInProgress: $("#statInProgress"),
+    statDone: $("#statDone"),
+    statNotStarted: $("#statNotStarted"),
+
+    // Units page
+    unitsSearch: $("#unitsSearch"),
+    unitsBlock: $("#unitsBlock"),
+    unitsRefresh: $("#unitsRefresh"),
+    unitCreate: $("#unitCreate"),
+    unitsTbody: $("#unitsTbody"),
+
+    // Contractors
+    contractorCreate: $("#contractorCreate"),
+    contractorsTbody: $("#contractorsTbody"),
+
+    // Engineers
+    engineerCreate: $("#engineerCreate"),
+    engineersTbody: $("#engineersTbody"),
+
+    // Workers
+    workerCreate: $("#workerCreate"),
+    workersTbody: $("#workersTbody"),
+
+    // Settings
+    apiOverride: $("#apiOverride"),
+    saveApi: $("#saveApi"),
+    resetApi: $("#resetApi"),
+
+    // Unit modal
+    unitModalBack: $("#unitModalBack"),
+    unitModalTitle: $("#unitModalTitle"),
+    unitModalSub: $("#unitModalSub"),
+    unitModalClose: $("#unitModalClose"),
+
+    assignContractor: $("#assignContractor"),
+    assignEngineer: $("#assignEngineer"),
+    assignStart: $("#assignStart"),
+    assignEnd: $("#assignEnd"),
+    assignSave: $("#assignSave"),
+
+    stagesBox: $("#stagesBox"),
+    stagesSave: $("#stagesSave"),
+
+    workerSelect: $("#workerSelect"),
+    workerType: $("#workerType"),
+    workerAdd: $("#workerAdd"),
+    unitWorkersTbody: $("#unitWorkersTbody"),
+  };
+
+  // -------------------------
+  // Pages routing
+  // -------------------------
+  const pages = ["dashboard", "units", "contractors", "engineers", "workers", "settings"];
+
+  function showPage(id) {
+    pages.forEach(p => {
+      const sec = $(`#page-${p}`);
+      if (!sec) return;
+      sec.classList.toggle("hidden", p !== id);
     });
-    return out;
-  }
 
-  function buildGenericPage(key){
-    const m = Modules[key];
-    const el = $("page-"+key);
-    if(!el) return;
-
-    // حماية: المهندس يبقى داخل engineers فقط
-    if(!canAccess(key)) return showPage("engineers");
-
-    const cols = (m.fields || []).map(f=>`<th>${f.label}</th>`).join("");
-    el.innerHTML = `
-      <div class="toolbar">
-        <div class="toolbar__left">
-          <h2>${m.title}</h2>
-          <div class="small dim">${m.help || ""}</div>
-        </div>
-        <div class="toolbar__right tableActions">
-          ${m.seed ? `<button class="btn" id="${key}SeedBtn">توليد 500 وحدة</button>` : ``}
-          <input class="input" id="${key}Search" placeholder="بحث..." />
-          <button class="btn" id="${key}Refresh">تحديث</button>
-          <button class="btn btn--primary" id="${key}Create">+ إضافة</button>
-          <button class="btn" id="${key}ExportCsv">تصدير CSV</button>
-          <button class="btn" id="${key}ExportXls">تصدير Excel</button>
-          <label class="btn" for="${key}ImportFile" style="cursor:pointer">استيراد CSV</label>
-          <input id="${key}ImportFile" type="file" accept=".csv" style="display:none" />
-        </div>
-      </div>
-      <div class="tableWrap">
-        <table class="table">
-          <thead><tr><th>إجراء</th>${cols}</tr></thead>
-          <tbody id="${key}Tbody"></tbody>
-        </table>
-      </div>
-      <div class="hint">ملاحظة: يمكنك تصدير Excel/CSV ثم فتحه على أي جهاز. (الاستيراد من CSV يدعم نفس الأعمدة).</div>
-    `;
-
-    const hook = (id, fn) => $(id)?.addEventListener("click", fn);
-
-    hook(`${key}Refresh`, ()=> renderGenericTable(key));
-    $(`${key}Search`)?.addEventListener("keydown", (e)=>{ if(e.key==="Enter") renderGenericTable(key); });
-
-    hook(`${key}Create`, ()=> openModalFor(key, null));
-
-    if(m.seed){
-      hook(`${key}SeedBtn`, ()=>{
-        if(getRole() !== "admin") return;
-        const db = loadDB();
-        m.seed(db);
-        saveDB(db);
-        renderAll();
-      });
-    }
-
-    hook(`${key}ExportCsv`, ()=> exportModule(key, "csv"));
-    hook(`${key}ExportXls`, ()=> exportModule(key, "xls"));
-    $(`${key}ImportFile`)?.addEventListener("change", async (e)=>{
-      const file = e.target.files?.[0];
-      e.target.value = "";
-      if(!file) return;
-      const text = await readFileText(file);
-      importModuleCSV(key, text);
+    $$(".nav__item", els.nav).forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.page === id);
     });
 
-    renderGenericTable(key);
-  }
-
-  function renderGenericTable(key){
-    const m = Modules[key];
-    const db = loadDB();
-    const arr = db[m.store] || [];
-    const q = ($(`${key}Search`)?.value || "").trim().toLowerCase();
-    const rows = q ? arr.filter(r => JSON.stringify(r).toLowerCase().includes(q)) : arr;
-
-    const tbody = $(`${key}Tbody`);
-    if(!tbody) return;
-
-    tbody.innerHTML = rows.map(r => {
-      const cells = (m.fields||[]).map(f=>{
-        const v = r[f.key];
-        const s = f.type==="number" ? fmt.format(Number(v||0)) : (v ?? "");
-        return `<td>${String(s)}</td>`;
-      }).join("");
-      return `<tr>
-        <td><button class="btn" data-edit="${key}:${r.id}">عرض</button></td>
-        ${cells}
-      </tr>`;
-    }).join("") || `<tr><td colspan="${(m.fields||[]).length+1}" class="small">لا توجد بيانات.</td></tr>`;
-
-    tbody.onclick = (e)=>{
-      const btn = e.target.closest("[data-edit]");
-      if(!btn) return;
-      const [k, id] = btn.dataset.edit.split(":");
-      openModalFor(k, Number(id));
+    const titleMap = {
+      dashboard: "الرئيسية",
+      units: "الوحدات السكنية",
+      contractors: "المقاولون",
+      engineers: "المهندسون",
+      workers: "العمال",
+      settings: "الإعدادات"
     };
-
-    refreshKPIs(db);
+    els.pageTitle.textContent = titleMap[id] || "—";
   }
 
-  function exportModule(key, mode){
-    const m = Modules[key];
-    const db = loadDB();
-    const rows = (db[m.store] || []).map(r=>{
-      const out={};
-      (m.fields||[]).forEach(f=> out[f.key]=r[f.key] ?? "");
-      return out;
-    });
-    const headers = (m.fields||[]).map(f=>({key:f.key, label:f.label}));
-    const fnameBase = `majma_adl_${key}_${todayISO()}`;
-    if(mode==="csv"){
-      downloadText(`${fnameBase}.csv`, toCSV(rows, headers), "text/csv;charset=utf-8");
-    }else{
-      downloadExcelHtml(`${fnameBase}.xls`, m.title, headers, rows);
+  // -------------------------
+  // Status / ping
+  // -------------------------
+  async function refreshApiStatus() {
+    els.apiBase.textContent = apiBase() ? apiBase() : "(لم يتم تعيين API)";
+    try {
+      await api.ping();
+      els.apiStatus.textContent = "متصل";
+      els.apiStatus.className = "pill pill--ok";
+    } catch (e) {
+      els.apiStatus.textContent = "غير متصل";
+      els.apiStatus.className = "pill pill--bad";
     }
   }
 
-  function importModuleCSV(key, csvText){
-    const m = Modules[key];
-    const parsed = parseCSV(csvText);
-    if(!parsed.length) return alert("ملف CSV فارغ.");
-    const head = parsed[0];
-    const map = {};
-    head.forEach((h, i)=>{ map[h.trim()] = i; });
+  // -------------------------
+  // Data loading
+  // -------------------------
+  async function loadAll() {
+    // Load reference lists first
+    const [contractors, engineers, workers] = await Promise.all([
+      api.contractors_list(),
+      api.engineers_list(),
+      api.workers_list(),
+    ]);
 
-    const missing = (m.fields||[]).filter(f=> map[f.key]===undefined && map[f.label]===undefined);
-    if(missing.length){
-      alert("أعمدة ناقصة في CSV: " + missing.map(x=>x.key).join(", "));
-      return;
-    }
+    cache.contractors = contractors.items || contractors || [];
+    cache.engineers = engineers.items || engineers || [];
+    cache.workers = workers.items || workers || [];
 
-    const db = loadDB();
-    const arr = db[m.store] || [];
-    const byId = new Map(arr.map(x=>[String(x.id), x]));
-    let added=0, updated=0;
+    // Load units (default view)
+    const units = await api.units_list({ search: (els.unitsSearch?.value || "").trim(), block: (els.unitsBlock?.value || "") });
+    cache.units = units.items || units || [];
 
-    for(let r=1; r<parsed.length; r++){
-      const row = parsed[r];
-      if(row.length===1 && row[0]==="") continue;
-      const obj = { id: uid() };
-      (m.fields||[]).forEach(f=>{
-        const idx = (map[f.key]!==undefined) ? map[f.key] : map[f.label];
-        obj[f.key] = row[idx] ?? "";
-      });
-
-      const idIdx = map["id"];
-      if(idIdx!==undefined && row[idIdx]){
-        const sid = String(row[idIdx]);
-        const existing = byId.get(sid);
-        if(existing){
-          Object.assign(existing, normalizeRow(m.fields, obj));
-          existing.id = Number(sid);
-          updated++;
-          continue;
-        }else{
-          obj.id = Number(sid);
-        }
-      }
-      arr.push(Object.assign({}, m.defaultRow ? m.defaultRow() : {}, normalizeRow(m.fields, obj)));
-      added++;
-    }
-    db[m.store] = arr;
-    saveDB(db);
     renderAll();
-    alert(`تم الاستيراد: إضافة ${added} | تحديث ${updated}`);
   }
 
-  // -----------------------
-  // Modal (Add/Edit/Delete)
-  // -----------------------
-  const modalBack = $("modalBack");
-  const modalTitle = $("modalTitle");
-  const modalSub = $("modalSub");
-  const modalForm = $("modalForm");
-  const modalClose = $("modalClose");
-  const modalSave = $("modalSave");
-  const modalDelete = $("modalDelete");
-  let modalCtx = { key:null, id:null };
+  // -------------------------
+  // Render helpers
+  // -------------------------
+  const stageDefs = [
+    { key: "ground", label: "أرض", weight: 33 },
+    { key: "structure", label: "هيكل", weight: 33 },
+    { key: "finish", label: "كامل", weight: 34 },
+  ];
 
-  function openModalFor(key, id){
-    const m = Modules[key];
-    if(!m || !m.fields) return;
+  function unitProgress(u) {
+    const stages = safeJson(u.stages) || {};
+    let p = 0;
+    for (const s of stageDefs) if (stages[s.key]) p += s.weight;
+    return Math.min(100, Math.max(0, p));
+  }
 
-    // Guard للمهندس
-    if(!canAccess(key)) return showPage("engineers");
+  function unitStatus(u) {
+    const p = unitProgress(u);
+    if (p >= 100) return "منجزة";
+    if (p <= 0) return "غير بادئة";
+    return "قيد التنفيذ";
+  }
 
-    const db = loadDB();
-    const arr = db[m.store] || [];
-    const row = id ? arr.find(x=>x.id===id) : null;
+  function pillStatus(text) {
+    if (text === "منجزة") return `<span class="pill pill--ok">${text}</span>`;
+    if (text === "غير بادئة") return `<span class="pill pill--dim">${text}</span>`;
+    return `<span class="pill pill--warn">${text}</span>`;
+  }
 
-    modalCtx = { key, id };
-    if(modalTitle) modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
-    if(modalSub) modalSub.textContent = id ? ("ID: "+id) : "—";
-    modalBack?.classList.remove("hidden");
+  function safeJson(v) {
+    if (!v) return null;
+    if (typeof v === "object") return v;
+    try { return JSON.parse(v); } catch { return null; }
+  }
 
-    modalForm.innerHTML = m.fields.map(f=>{
-      const def = m.defaultRow ? m.defaultRow() : {};
-      const v = row ? (row[f.key] ?? "") : (def[f.key] ?? "");
-      const req = f.required ? "required" : "";
-      if(f.type==="select"){
-        const opts = (f.options||[]).map(o=>{
-          const sel = String(o)===String(v) ? "selected" : "";
-          return `<option value="${String(o)}" ${sel}>${String(o)}</option>`;
-        }).join("");
-        return `<div>
-          <label>${f.label}${f.required? " *":""}</label>
-          <select class="input" data-k="${f.key}" ${req}>${opts}</select>
-        </div>`;
-      }
-      if(f.type==="textarea"){
-        return `<div>
-          <label>${f.label}</label>
-          <textarea class="input" data-k="${f.key}" rows="3" style="min-height:90px">${String(v)}</textarea>
-        </div>`;
-      }
-      const attrs = [];
-      if(f.min!==undefined) attrs.push(`min="${f.min}"`);
-      if(f.max!==undefined) attrs.push(`max="${f.max}"`);
-      if(f.step!==undefined) attrs.push(`step="${f.step}"`);
-      return `<div>
-        <label>${f.label}${f.required? " *":""}</label>
-        <input class="input" data-k="${f.key}" type="${f.type||"text"}" value="${String(v)}" ${req} ${attrs.join(" ")} />
-      </div>`;
+  function byId(list, id) {
+    return list.find(x => String(x.id) === String(id));
+  }
+
+  function renderDashboard() {
+    const units = cache.units || [];
+    const total = units.length;
+
+    let sumProgress = 0;
+    let done = 0, notStarted = 0, inProg = 0;
+
+    for (const u of units) {
+      const p = unitProgress(u);
+      sumProgress += p;
+      const st = unitStatus(u);
+      if (st === "منجزة") done++;
+      else if (st === "غير بادئة") notStarted++;
+      else inProg++;
+    }
+
+    const avg = total ? Math.round(sumProgress / total) : 0;
+
+    els.kpiUnits.textContent = total ? String(total) : "--";
+    els.kpiProgress.textContent = total ? `${avg}%` : "--";
+    els.kpiContractors.textContent = cache.contractors.length ? String(cache.contractors.length) : "--";
+
+    els.statDone.textContent = total ? String(done) : "--";
+    els.statNotStarted.textContent = total ? String(notStarted) : "--";
+    els.statInProgress.textContent = total ? String(inProg) : "--";
+  }
+
+  function renderBlocksDropdown() {
+    if (!els.unitsBlock) return;
+    const blocks = Array.from(new Set((cache.units || []).map(u => (u.block || "").trim()).filter(Boolean))).sort();
+    const current = els.unitsBlock.value || "";
+    els.unitsBlock.innerHTML = `<option value="">كل البلوكات</option>` + blocks.map(b => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
+    els.unitsBlock.value = current;
+  }
+
+  function renderUnitsTable() {
+    if (!els.unitsTbody) return;
+
+    const units = cache.units || [];
+    els.unitsTbody.innerHTML = units.map(u => {
+      const p = unitProgress(u);
+      const st = unitStatus(u);
+      return `
+        <tr>
+          <td>${escapeHtml(u.number ?? "")}</td>
+          <td>${escapeHtml(u.block ?? "")}</td>
+          <td>${pillStatus(st)}</td>
+          <td><b>${p}%</b></td>
+          <td><button class="btn btn--small" data-open-unit="${escapeAttr(u.id)}">تفاصيل</button></td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="5" class="dim small">لا توجد وحدات.</td></tr>`;
+
+    // bind open buttons
+    $$(`[data-open-unit]`, els.unitsTbody).forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-open-unit");
+        await openUnitModal(id);
+      });
+    });
+  }
+
+  function renderContractorsTable() {
+    if (!els.contractorsTbody) return;
+    const list = cache.contractors || [];
+    els.contractorsTbody.innerHTML = list.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name || "")}</td>
+        <td>${escapeHtml(c.phone || "")}</td>
+        <td>${c.active === 0 ? `<span class="pill pill--dim">متوقف</span>` : `<span class="pill pill--ok">نشط</span>`}</td>
+        <td class="tdActions">
+          <button class="btn btn--small" data-edit-con="${escapeAttr(c.id)}">تعديل</button>
+          <button class="btn btn--small btn--danger" data-del-con="${escapeAttr(c.id)}">حذف</button>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" class="dim small">لا يوجد مقاولون.</td></tr>`;
+
+    $$(`[data-edit-con]`, els.contractorsTbody).forEach(b => b.addEventListener("click", () => editContractor(b.getAttribute("data-edit-con"))));
+    $$(`[data-del-con]`, els.contractorsTbody).forEach(b => b.addEventListener("click", () => delContractor(b.getAttribute("data-del-con"))));
+  }
+
+  function renderEngineersTable() {
+    if (!els.engineersTbody) return;
+    const list = cache.engineers || [];
+    els.engineersTbody.innerHTML = list.map(e => `
+      <tr>
+        <td>${escapeHtml(e.name || "")}</td>
+        <td>${escapeHtml(e.salary_type || "شهري")}</td>
+        <td>${escapeHtml(String(e.amount ?? 0))}</td>
+        <td class="tdActions">
+          <button class="btn btn--small" data-edit-eng="${escapeAttr(e.id)}">تعديل</button>
+          <button class="btn btn--small btn--danger" data-del-eng="${escapeAttr(e.id)}">حذف</button>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" class="dim small">لا يوجد مهندسون.</td></tr>`;
+
+    $$(`[data-edit-eng]`, els.engineersTbody).forEach(b => b.addEventListener("click", () => editEngineer(b.getAttribute("data-edit-eng"))));
+    $$(`[data-del-eng]`, els.engineersTbody).forEach(b => b.addEventListener("click", () => delEngineer(b.getAttribute("data-del-eng"))));
+  }
+
+  function renderWorkersTable() {
+    if (!els.workersTbody) return;
+    const list = cache.workers || [];
+    els.workersTbody.innerHTML = list.map(w => `
+      <tr>
+        <td>${escapeHtml(w.name || "")}</td>
+        <td>${escapeHtml(w.salary_type || "يومي")}</td>
+        <td>${escapeHtml(String(w.amount ?? 0))}</td>
+        <td class="tdActions">
+          <button class="btn btn--small" data-edit-wrk="${escapeAttr(w.id)}">تعديل</button>
+          <button class="btn btn--small btn--danger" data-del-wrk="${escapeAttr(w.id)}">حذف</button>
+        </td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" class="dim small">لا يوجد عمال.</td></tr>`;
+
+    $$(`[data-edit-wrk]`, els.workersTbody).forEach(b => b.addEventListener("click", () => editWorker(b.getAttribute("data-edit-wrk"))));
+    $$(`[data-del-wrk]`, els.workersTbody).forEach(b => b.addEventListener("click", () => delWorker(b.getAttribute("data-del-wrk"))));
+  }
+
+  function renderSettings() {
+    if (!els.apiOverride) return;
+    els.apiOverride.value = apiBase() || "";
+  }
+
+  function renderAll() {
+    renderDashboard();
+    renderBlocksDropdown();
+    renderUnitsTable();
+    renderContractorsTable();
+    renderEngineersTable();
+    renderWorkersTable();
+    renderSettings();
+  }
+
+  // -------------------------
+  // Modal: unit details
+  // -------------------------
+  function openModal() { els.unitModalBack.classList.remove("hidden"); }
+  function closeModal() { els.unitModalBack.classList.add("hidden"); selectedUnit = null; }
+
+  async function openUnitModal(unitId) {
+    const u = await api.unit_get(unitId);
+    selectedUnit = u;
+
+    els.unitModalTitle.textContent = `تفاصيل الوحدة رقم ${u.number}`;
+    els.unitModalSub.textContent = `بلوك: ${u.block || "—"} • الحالة: ${unitStatus(u)} • الإنجاز: ${unitProgress(u)}%`;
+
+    // Fill assignment selects
+    els.assignContractor.innerHTML = `<option value="">— بدون —</option>` + (cache.contractors || []).map(c => `<option value="${escapeAttr(c.id)}">${escapeHtml(c.name)}</option>`).join("");
+    els.assignEngineer.innerHTML = `<option value="">— بدون —</option>` + (cache.engineers || []).map(e => `<option value="${escapeAttr(e.id)}">${escapeHtml(e.name)}</option>`).join("");
+
+    els.assignContractor.value = u.contractor_id ? String(u.contractor_id) : "";
+    els.assignEngineer.value = u.engineer_id ? String(u.engineer_id) : "";
+    els.assignStart.value = u.start_date || "";
+    els.assignEnd.value = u.end_date || "";
+
+    // stages
+    const st = safeJson(u.stages) || {};
+    els.stagesBox.innerHTML = stageDefs.map(s => {
+      const checked = !!st[s.key];
+      return `
+        <label class="stage">
+          <input type="checkbox" data-stage="${escapeAttr(s.key)}" ${checked ? "checked" : ""} />
+          <span>${escapeHtml(s.label)}</span>
+        </label>
+      `;
     }).join("");
 
-    if(modalDelete) modalDelete.style.display = id ? "inline-block" : "none";
+    // workers select
+    els.workerSelect.innerHTML = `<option value="">اختر عامل...</option>` + (cache.workers || []).map(w => `<option value="${escapeAttr(w.id)}">${escapeHtml(w.name)}</option>`).join("");
+    els.workerType.value = "";
+
+    // unit workers table
+    await refreshUnitWorkersTable(u.id);
+
+    openModal();
   }
 
-  function closeModal(){ modalBack?.classList.add("hidden"); }
-  modalClose?.addEventListener("click", closeModal);
-  modalBack?.addEventListener("click",(e)=>{ if(e.target===modalBack) closeModal(); });
+  async function refreshUnitWorkersTable(unitId) {
+    const data = await api.unit_workers_list(unitId);
+    const rows = data.items || data || [];
+    els.unitWorkersTbody.innerHTML = rows.map(r => {
+      const w = byId(cache.workers, r.worker_id);
+      return `
+        <tr>
+          <td>${escapeHtml(w ? w.name : "—")}</td>
+          <td>${escapeHtml(r.work_type || "")}</td>
+          <td>${escapeHtml(r.from_date || "")}</td>
+          <td>${escapeHtml(r.to_date || "")}</td>
+          <td class="tdActions">
+            <button class="btn btn--small" data-edit-uw="${escapeAttr(r.id)}">تعديل</button>
+            <button class="btn btn--small btn--danger" data-del-uw="${escapeAttr(r.id)}">حذف</button>
+          </td>
+        </tr>
+      `;
+    }).join("") || `<tr><td colspan="5" class="dim small">لا يوجد عمال لهذه الوحدة.</td></tr>`;
 
-  modalSave?.addEventListener("click", ()=>{
-    const {key, id} = modalCtx;
-    const m = Modules[key];
-    if(!m) return;
+    $$(`[data-del-uw]`, els.unitWorkersTbody).forEach(b => b.addEventListener("click", async () => {
+      const id = b.getAttribute("data-del-uw");
+      if (!selectedUnit) return;
+      if (!confirm("حذف هذا السطر؟")) return;
+      await api.unit_worker_delete(selectedUnit.id, id);
+      await refreshUnitWorkersTable(selectedUnit.id);
+    }));
 
-    if(!canAccess(key)) return showPage("engineers");
+    $$(`[data-edit-uw]`, els.unitWorkersTbody).forEach(b => b.addEventListener("click", async () => {
+      const id = b.getAttribute("data-edit-uw");
+      if (!selectedUnit) return;
+      const list = await api.unit_workers_list(selectedUnit.id);
+      const rows = list.items || list || [];
+      const row = rows.find(x => String(x.id) === String(id));
+      if (!row) return;
 
-    const db = loadDB();
-    const arr = db[m.store] || [];
+      const newType = prompt("نوع العمل:", row.work_type || "");
+      if (newType === null) return;
+      const from = prompt("من (YYYY-MM-DD):", row.from_date || "");
+      if (from === null) return;
+      const to = prompt("إلى (YYYY-MM-DD):", row.to_date || "");
+      if (to === null) return;
 
-    const obj = { id: id || uid() };
-    let ok = true;
+      await api.unit_worker_update(selectedUnit.id, id, { work_type: newType, from_date: from, to_date: to });
+      await refreshUnitWorkersTable(selectedUnit.id);
+    }));
+  }
 
-    (m.fields||[]).forEach(f=>{
-      const el = modalForm.querySelector(`[data-k="${CSS.escape(f.key)}"]`);
-      if(!el) return;
-      let v = el.value;
-      if(f.required && !String(v||"").trim()) ok=false;
-      if(f.type==="number") v = Number(v||0);
-      obj[f.key] = v;
+  // -------------------------
+  // CRUD dialogs (simple prompt)
+  // -------------------------
+  async function editContractor(id) {
+    const c = byId(cache.contractors, id);
+    if (!c) return;
+    const name = prompt("اسم المقاول:", c.name || "");
+    if (name === null) return;
+    const phone = prompt("الهاتف:", c.phone || "");
+    if (phone === null) return;
+    const active = confirm("هل المقاول نشط؟ (OK = نشط، Cancel = متوقف)") ? 1 : 0;
+    await api.contractor_update(id, { name, phone, active });
+    await loadAll();
+  }
+  async function delContractor(id) {
+    if (!confirm("حذف المقاول؟")) return;
+    await api.contractor_delete(id);
+    await loadAll();
+  }
+
+  async function editEngineer(id) {
+    const e = byId(cache.engineers, id);
+    if (!e) return;
+    const name = prompt("اسم المهندس:", e.name || "");
+    if (name === null) return;
+    const salary_type = prompt("نوع الراتب (شهري/مقطوعة/نسبة):", e.salary_type || "شهري");
+    if (salary_type === null) return;
+    const amount = prompt("المبلغ:", String(e.amount ?? 0));
+    if (amount === null) return;
+    await api.engineer_update(id, { name, salary_type, amount: Number(amount || 0) });
+    await loadAll();
+  }
+  async function delEngineer(id) {
+    if (!confirm("حذف المهندس؟")) return;
+    await api.engineer_delete(id);
+    await loadAll();
+  }
+
+  async function editWorker(id) {
+    const w = byId(cache.workers, id);
+    if (!w) return;
+    const name = prompt("اسم العامل:", w.name || "");
+    if (name === null) return;
+    const salary_type = prompt("نوع الراتب (يومي/شهري/مقطوعة):", w.salary_type || "يومي");
+    if (salary_type === null) return;
+    const amount = prompt("المبلغ:", String(w.amount ?? 0));
+    if (amount === null) return;
+    await api.worker_update(id, { name, salary_type, amount: Number(amount || 0) });
+    await loadAll();
+  }
+  async function delWorker(id) {
+    if (!confirm("حذف العامل؟")) return;
+    await api.worker_delete(id);
+    await loadAll();
+  }
+
+  // -------------------------
+  // Events
+  // -------------------------
+  function bindEvents() {
+    // Login
+    els.loginUser.value = getSavedUser();
+    els.loginPass.value = "";
+    els.loginBtn.addEventListener("click", () => {
+      const u = (els.loginUser.value || "").trim();
+      const p = (els.loginPass.value || "").trim();
+      if (u === getSavedUser() && p === getSavedPass()) {
+        setAuthed();
+        els.loginBack.classList.add("hidden");
+        boot();
+      } else {
+        alert("بيانات الدخول غير صحيحة");
+      }
     });
 
-    if(!ok) return alert("أكمل الحقول المطلوبة (*)");
-
-    const normalized = Object.assign({}, m.defaultRow? m.defaultRow():{}, normalizeRow(m.fields, obj));
-    if(id){
-      const idx = arr.findIndex(x=>x.id===id);
-      if(idx>=0) arr[idx] = Object.assign(arr[idx], normalized);
-    }else{
-      arr.push(normalized);
-    }
-    db[m.store] = arr;
-
-    if(typeof m.afterSave === "function"){
-      try{ m.afterSave(db, normalized); }catch{}
-    }
-
-    saveDB(db);
-    closeModal();
-    renderAll();
-  });
-
-  modalDelete?.addEventListener("click", ()=>{
-    const {key, id} = modalCtx;
-    if(!id) return;
-    if(!canAccess(key)) return showPage("engineers");
-    if(!confirm("تأكيد الحذف؟")) return;
-    const m = Modules[key];
-    const db = loadDB();
-    const arr = db[m.store] || [];
-    db[m.store] = arr.filter(x=>x.id!==id);
-    saveDB(db);
-    closeModal();
-    renderAll();
-  });
-
-  // -----------------------
-  // Render routing
-  // -----------------------
-  function renderPage(key){
-    if(key==="dashboard"){ renderDashboard(); return; }
-    const m = Modules[key];
-    if(!m) return;
-    buildGenericPage(key);
-  }
-
-  function renderDashboard(){
-    const db = loadDB();
-    refreshKPIs(db);
-  }
-
-  function refreshKPIs(db){
-    const units = db.units || [];
-    const totalUnits = units.length;
-    const inProg = units.filter(u=>u.الحالة==="قيد التنفيذ").length;
-    const done = units.filter(u=>u.الحالة==="مكتملة").length;
-
-    $("kpiUnits") && ($("kpiUnits").textContent = fmt.format(totalUnits));
-    $("kpiInProgress") && ($("kpiInProgress").textContent = fmt.format(inProg));
-    $("kpiDone") && ($("kpiDone").textContent = fmt.format(done));
-
-    let balance = 0;
-    (db.accounts||[]).forEach(x=>{
-      const amt = Number(x.المبلغ||0);
-      if(x.النوع==="إيداع") balance += amt;
-      else balance -= amt;
+    // Sidebar nav
+    $$(".nav__item", els.nav).forEach(btn => {
+      btn.addEventListener("click", () => {
+        showPage(btn.dataset.page);
+      });
     });
-    $("kpiBalance") && ($("kpiBalance").textContent = fmt.format(balance));
 
-    $("statItems") && ($("statItems").textContent = fmt.format((db.inventory_items||[]).length));
-    const purTotal = (db.purchases||[]).reduce((s,p)=>s+Number(p.الإجمالي||0),0);
-    $("statPurchases") && ($("statPurchases").textContent = fmt.format(purTotal));
-    const expTotal = (db.accounts||[]).filter(x=>x.النوع==="مصروف").reduce((s,x)=>s+Number(x.المبلغ||0),0);
-    $("statExpenses") && ($("statExpenses").textContent = fmt.format(expTotal));
-  }
+    // Seed 500
+    els.seedBtn.addEventListener("click", async () => {
+      if (!confirm("توليد 500 وحدة؟ (سيتم إنشاء وحدات في قاعدة البيانات)")) return;
+      await api.units_seed(500);
+      await loadAll();
+      alert("تم توليد الوحدات");
+    });
 
-  function renderAll(){
-    const db = loadDB();
-    refreshKPIs(db);
-    const roleDefault = (getRole()==="engineer") ? "engineers" : "dashboard";
-    const active = document.querySelector(".nav__item.active")?.dataset.page || roleDefault;
-    renderPage(active);
-  }
+    // Units filters
+    els.unitsRefresh.addEventListener("click", async () => {
+      const units = await api.units_list({ search: (els.unitsSearch.value || "").trim(), block: (els.unitsBlock.value || "") });
+      cache.units = units.items || units || [];
+      renderAll();
+    });
+    els.unitsSearch.addEventListener("input", debounce(async () => {
+      const units = await api.units_list({ search: (els.unitsSearch.value || "").trim(), block: (els.unitsBlock.value || "") });
+      cache.units = units.items || units || [];
+      renderAll();
+    }, 300));
+    els.unitsBlock.addEventListener("change", async () => {
+      const units = await api.units_list({ search: (els.unitsSearch.value || "").trim(), block: (els.unitsBlock.value || "") });
+      cache.units = units.items || units || [];
+      renderAll();
+    });
 
-  // -----------------------
-  // Settings: API base + Backup (إذا موجودة بالـ HTML)
-  // -----------------------
-  $("saveApi")?.addEventListener("click", async ()=>{
-    const v = ($("apiOverride")?.value || "").trim();
-    if(v) localStorage.setItem(API_OVERRIDE_KEY, v);
-    else localStorage.removeItem(API_OVERRIDE_KEY);
-    await pingServer();
-    alert("✅ تم حفظ رابط الـ API.");
-  });
+    // Create unit
+    els.unitCreate.addEventListener("click", async () => {
+      const number = prompt("رقم الوحدة (مثال 1 أو A-1):", "");
+      if (number === null) return;
+      const block = prompt("اسم/رقم البلوك:", "");
+      if (block === null) return;
+      await api.unit_create({ number, block, stages: JSON.stringify({}) });
+      await loadAll();
+    });
 
-  $("resetApi")?.addEventListener("click", async ()=>{
-    localStorage.removeItem(API_OVERRIDE_KEY);
-    if($("apiOverride")) $("apiOverride").value = "";
-    await pingServer();
-    alert("✅ تم إرجاع الرابط للوضع الافتراضي.");
-  });
+    // Create contractor/engineer/worker
+    els.contractorCreate.addEventListener("click", async () => {
+      const name = prompt("اسم المقاول:", "");
+      if (!name) return;
+      const phone = prompt("الهاتف:", "") || "";
+      await api.contractor_create({ name, phone, active: 1 });
+      await loadAll();
+    });
 
-  // backup buttons (إذا موجودة)
-  $("exportJsonBtn")?.addEventListener("click", exportBackupJSON);
-  $("importJsonFile")?.addEventListener("change", async (e)=>{
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if(!f) return;
-    await importBackupJSON(f);
-  });
+    els.engineerCreate.addEventListener("click", async () => {
+      const name = prompt("اسم المهندس:", "");
+      if (!name) return;
+      const salary_type = prompt("نوع الراتب (شهري/مقطوعة/نسبة):", "شهري") || "شهري";
+      const amount = Number(prompt("المبلغ:", "0") || 0);
+      await api.engineer_create({ name, salary_type, amount });
+      await loadAll();
+    });
 
-  $("wipeBtn")?.addEventListener("click", ()=>{
-    if(!confirm("سيتم حذف كل البيانات المحفوظة محلياً. هل أنت متأكد؟")) return;
-    localStorage.removeItem(DB_KEY);
-    DB_MEM = null;
-    alert("✅ تم حذف البيانات.");
-    renderAll();
-  });
+    els.workerCreate.addEventListener("click", async () => {
+      const name = prompt("اسم العامل:", "");
+      if (!name) return;
+      const salary_type = prompt("نوع الراتب (يومي/شهري/مقطوعة):", "يومي") || "يومي";
+      const amount = Number(prompt("المبلغ:", "0") || 0);
+      await api.worker_create({ name, salary_type, amount });
+      await loadAll();
+    });
 
-  // زر توليد 500 وحدة (الهيدر) - admin فقط
-  $("seedBtn")?.addEventListener("click", ()=>{
-    if(getRole() !== "admin") return;
-    const db = loadDB();
-    Modules.units.seed(db);
-    saveDB(db);
-    renderAll();
-    alert("✅ تم توليد/تثبيت 500 وحدة (إذا كانت موجودة مسبقاً لن تتكرر).");
-  });
+    // Unit modal
+    els.unitModalClose.addEventListener("click", closeModal);
+    els.unitModalBack.addEventListener("click", (e) => {
+      if (e.target === els.unitModalBack) closeModal();
+    });
 
-  // -----------------------
-  // PWA
-  // -----------------------
-  async function registerSW(){
-    if(!("serviceWorker" in navigator)) return;
-    try{ await navigator.serviceWorker.register("./sw.js"); }catch{}
-  }
-
-  // -----------------------
-  // Boot
-  // -----------------------
-  async function boot(){
-    // ضع قيمة الإعداد داخل input إذا موجود
-    if($("apiOverride")){
-      $("apiOverride").value = getApiBase();
-    }
-
-    if(!isAuthed()){
-      showLogin(true);
-      const btn = $("loginBtn");
-      const inpUser = $("loginUser");
-      const inpPass = $("loginPass");
-
-      const doLogin = async ()=>{
-        const u = (inpUser?.value || "").trim();
-        const p = (inpPass?.value || "");
-        if(!u || !p) return alert("اكتب اسم المستخدم وكلمة المرور.");
-        const ok = await tryLogin(u, p);
-        if(ok){
-          showLogin(false);
-          if(inpPass) inpPass.value = "";
-
-          applyRoleUI();
-          await syncFromServer();
-          await pingServer();
-
-          if(getRole() === "engineer"){
-            showPage("engineers");
-          }else{
-            showPage("dashboard");
-          }
-          renderAll();
-        }else{
-          alert("بيانات الدخول غير صحيحة.");
-        }
+    // Save assignment
+    els.assignSave.addEventListener("click", async () => {
+      if (!selectedUnit) return;
+      const payload = {
+        contractor_id: els.assignContractor.value || null,
+        engineer_id: els.assignEngineer.value || null,
+        start_date: els.assignStart.value || null,
+        end_date: els.assignEnd.value || null,
       };
+      await api.unit_update(selectedUnit.id, payload);
+      await loadAll();
+      await openUnitModal(selectedUnit.id);
+      alert("تم حفظ التعيين");
+    });
 
-      btn?.addEventListener("click", doLogin);
-      inpPass?.addEventListener("keydown",(e)=>{ if(e.key==="Enter") doLogin(); });
-      return;
-    }
+    // Save stages
+    els.stagesSave.addEventListener("click", async () => {
+      if (!selectedUnit) return;
+      const s = {};
+      $$(`[data-stage]`, els.stagesBox).forEach(ch => {
+        const key = ch.getAttribute("data-stage");
+        s[key] = !!ch.checked;
+      });
+      await api.unit_update(selectedUnit.id, { stages: JSON.stringify(s) });
+      await loadAll();
+      await openUnitModal(selectedUnit.id);
+      alert("تم حفظ مراحل البناء");
+    });
 
-    showLogin(false);
+    // Add unit worker
+    els.workerAdd.addEventListener("click", async () => {
+      if (!selectedUnit) return;
+      const worker_id = els.workerSelect.value;
+      if (!worker_id) return alert("اختر عامل");
+      const work_type = (els.workerType.value || "").trim();
+      if (!work_type) return alert("اكتب نوع العمل");
+      await api.unit_worker_add(selectedUnit.id, {
+        worker_id,
+        work_type,
+        from_date: null,
+        to_date: null,
+      });
+      els.workerType.value = "";
+      await refreshUnitWorkersTable(selectedUnit.id);
+      await loadAll();
+    });
 
-    applyRoleUI();
-    await syncFromServer();
-    await pingServer();
-
-    const db = loadDB();
-    if(getRole() === "admin"){
-      Modules.units.seed(db);
-      saveDB(db);
-    }
-
-    registerSW();
-
-    if(getRole() === "engineer"){
-      showPage("engineers");
-    }else{
-      showPage("dashboard");
-    }
-    renderAll();
+    // Settings: API override
+    els.saveApi.addEventListener("click", async () => {
+      setApiBase(els.apiOverride.value);
+      await refreshApiStatus();
+      alert("تم حفظ رابط الـ API");
+    });
+    els.resetApi.addEventListener("click", async () => {
+      setApiBase("");
+      renderSettings();
+      await refreshApiStatus();
+      alert("تم الإرجاع");
+    });
   }
 
-  boot();
+  // -------------------------
+  // Boot
+  // -------------------------
+  async function boot() {
+    showPage("dashboard");
+    await refreshApiStatus();
+
+    try {
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+      alert("تعذر تحميل البيانات. تأكد من رابط الـ API في الإعدادات.");
+    }
+  }
+
+  // -------------------------
+  // Utilities
+  // -------------------------
+  function debounce(fn, ms) {
+    let t = null;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+  function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+
+  // -------------------------
+  // Init (Login gate)
+  // -------------------------
+  bindEvents();
+
+  if (!isAuthed()) {
+    els.loginBack.classList.remove("hidden");
+  } else {
+    els.loginBack.classList.add("hidden");
+    boot();
+  }
+
+  // expose lock if you want later
+  window.__lock = lock;
 })();
