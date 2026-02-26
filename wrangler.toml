@@ -1,0 +1,10 @@
+name = "majma-adl-dashboard"
+compatibility_date = "2026-02-26"
+
+# This file is optional for Cloudflare Pages, but useful for local dev with wrangler.
+# Bind a D1 database named majma_adl_db to env.DB in Pages Functions.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "majma_adl_db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"

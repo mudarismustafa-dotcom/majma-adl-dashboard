@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>مجمع العدل السكني - لوحة الإدارة</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#0b0f17" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="./app.js" defer></script>
+  <link rel="icon" href="./icon-192.png" />
+</head>
+<body>
+
+  <!-- شاشة تسجيل الدخول -->
+  <div class="loginBack hidden" id="loginBack">
+    <div class="loginCard">
+      <div class="loginBrand">
+        <img src="./logo.svg" alt="logo" style="width:72px;height:72px;object-fit:contain">
+        <h2 style="margin:8px 0 0">مجمع العدل السكني</h2>
+        <div class="small dim">تسجيل الدخول</div>
+      </div>
+      <input id="loginUser" class="input" placeholder="اسم المستخدم" />
+      <input id="loginPass" type="password" class="input" placeholder="كلمة المرور" style="margin-top:8px" />
+      <button id="loginBtn" class="btn btn--primary" style="width:100%; margin-top:10px">دخول</button>
+      <div class="small dim" style="margin-top:8px">الافتراضي: admin / @1000@</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="brand__logo" src="./logo.svg" alt="شعار مجمع العدل السكني" />
+      </div>
+
+      <nav class="nav" id="nav">
+        <button class="nav__item active" data-page="dashboard">الرئيسية</button>
+        <button class="nav__item" data-page="units">الوحدات السكنية</button>
+        <button class="nav__item" data-page="contractors">المقاولون</button>
+        <button class="nav__item" data-page="engineers">المهندسون</button>
+        <button class="nav__item" data-page="workers">العمال</button>
+        <button class="nav__item" data-page="settings">الإعدادات</button>
+      </nav>
+
+      <div class="sidebar__footer">
+        <div class="small">حالة السيرفر:</div>
+        <div class="pill" id="apiStatus">غير متصل</div>
+        <div class="small dim" id="apiBase"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__left">
+          <h1 id="pageTitle">الرئيسية</h1>
+          <div class="small dim">نظام كامل يحفظ بيانات فعلياً (Cloudflare Workers + D1)</div>
+        </div>
+        <div class="topbar__right">
+          <button class="btn btn--ghost" id="seedBtn">توليد 500 وحدة</button>
+        </div>
+      </header>
+
+      <section class="hero card">
+        <div class="hero__media">
+          <img src="./hero.png" alt="صورة واجهة" />
+        </div>
+        <div class="hero__text">
+          <h2>إدارة مجمع العدل السكني</h2>
+          <p class="dim">
+            إدارة الوحدات (500)، تعيين المقاول والمهندس، العمال، ومراحل البناء (أرض/هيكل/كامل).
+          </p>
+          <div class="row">
+            <div class="kpi">
+              <div class="kpi__label">عدد الوحدات</div>
+              <div class="kpi__value" id="kpiUnits">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi__label">نسبة الإنجاز</div>
+              <div class="kpi__value" id="kpiProgress">--</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi__label">المقاولون</div>
+              <div class="kpi__value" id="kpiContractors">--</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card page" id="page-dashboard">
+        <h2>لوحة مختصرة</h2>
+        <div class="row">
+          <div class="stat"><div class="stat__title">قيد التنفيذ</div><div class="stat__value" id="statInProgress">--</div></div>
+          <div class="stat"><div class="stat__title">منجزة</div><div class="stat__value" id="statDone">--</div></div>
+          <div class="stat"><div class="stat__title">غير بادئة</div><div class="stat__value" id="statNotStarted">--</div></div>
+        </div>
+        <p class="small dim">هذه نسخة أولى جاهزة للتوسع (مشتريات/محاسبة/مخزن كامل) حسب أولوياتك.</p>
+      </section>
+
+      <section class="card page hidden" id="page-units">
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <h2>الوحدات السكنية</h2>
+            <div class="small dim">بحث + تفاصيل الوحدة + تعديل التعيين + مراحل البناء + العمال</div>
+          </div>
+          <div class="toolbar__right">
+            <input class="input" id="unitsSearch" placeholder="بحث برقم الوحدة..." />
+            <select class="input" id="unitsBlock"><option value="">كل البلوكات</option></select>
+            <button class="btn" id="unitsRefresh">تحديث</button>
+            <button class="btn btn--primary" id="unitCreate">+ إضافة وحدة</button>
+          </div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead><tr><th>رقم</th><th>بلوك</th><th>الحالة</th><th>الإنجاز</th><th>إجراء</th></tr></thead>
+            <tbody id="unitsTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card page hidden" id="page-contractors">
+        <div class="toolbar">
+          <div class="toolbar__left"><h2>المقاولون</h2></div>
+          <div class="toolbar__right"><button class="btn btn--primary" id="contractorCreate">+ إضافة مقاول</button></div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead><tr><th>الاسم</th><th>الهاتف</th><th>الحالة</th><th>إجراء</th></tr></thead>
+            <tbody id="contractorsTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card page hidden" id="page-engineers">
+        <div class="toolbar">
+          <div class="toolbar__left"><h2>المهندسون</h2></div>
+          <div class="toolbar__right"><button class="btn btn--primary" id="engineerCreate">+ إضافة مهندس</button></div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead><tr><th>الاسم</th><th>نوع الراتب</th><th>المبلغ</th><th>إجراء</th></tr></thead>
+            <tbody id="engineersTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card page hidden" id="page-workers">
+        <div class="toolbar">
+          <div class="toolbar__left"><h2>العمال</h2></div>
+          <div class="toolbar__right"><button class="btn btn--primary" id="workerCreate">+ إضافة عامل</button></div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead><tr><th>الاسم</th><th>نوع الراتب</th><th>المبلغ</th><th>إجراء</th></tr></thead>
+            <tbody id="workersTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card page hidden" id="page-settings">
+        <h2>الإعدادات</h2>
+        <div class="small dim">إذا كان رابط الـ API مختلف (Workers)، ضعه هنا:</div>
+        <div class="row">
+          <input class="input" id="apiOverride" placeholder="https://majma-adl-api.xxx.workers.dev" />
+          <button class="btn" id="saveApi">حفظ</button>
+          <button class="btn btn--ghost" id="resetApi">إرجاع</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- نافذة تفاصيل الوحدة -->
+  <div class="modalBack hidden" id="unitModalBack">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal__head">
+        <div>
+          <h2 id="unitModalTitle">تفاصيل الوحدة</h2>
+          <div class="small dim" id="unitModalSub">—</div>
+        </div>
+        <button class="btn btn--ghost" id="unitModalClose">إغلاق</button>
+      </div>
+
+      <div class="grid2">
+        <div class="card inner">
+          <h3>التعيين (مقاول / مهندس / تواريخ)</h3>
+          <div class="form">
+            <label>المقاول</label>
+            <select class="input" id="assignContractor"></select>
+
+            <label>المهندس المشرف</label>
+            <select class="input" id="assignEngineer"></select>
+
+            <div class="row">
+              <div class="col">
+                <label>تاريخ بدء العمل</label>
+                <input class="input" type="date" id="assignStart" />
+              </div>
+              <div class="col">
+                <label>تاريخ الإنجاز الفعلي</label>
+                <input class="input" type="date" id="assignEnd" />
+              </div>
+            </div>
+
+            <button class="btn btn--primary" id="assignSave">حفظ التعيين</button>
+          </div>
+        </div>
+
+        <div class="card inner">
+          <h3>مراحل البناء</h3>
+          <div id="stagesBox" class="stages"></div>
+          <button class="btn" id="stagesSave">حفظ مراحل البناء</button>
+        </div>
+      </div>
+
+      <div class="card inner" style="margin-top:12px;">
+        <div class="toolbar">
+          <div class="toolbar__left"><h3>العمال في الوحدة</h3></div>
+          <div class="toolbar__right">
+            <select class="input" id="workerSelect"></select>
+            <input class="input" id="workerType" placeholder="نوع العمل (مثال: سيراميك)" />
+            <button class="btn btn--primary" id="workerAdd">إضافة</button>
+          </div>
+        </div>
+        <div class="tableWrap">
+          <table class="table">
+            <thead><tr><th>الاسم</th><th>نوع العمل</th><th>من</th><th>إلى</th><th>إجراء</th></tr></thead>
+            <tbody id="unitWorkersTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

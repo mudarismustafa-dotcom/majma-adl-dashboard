@@ -1,0 +1,101 @@
+/* مجمع العدل السكني - RTL */
+:root{
+  --bg:#0b0f17; --panel:rgba(255,255,255,.04); --panel2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.10); --text:#e8eefc; --muted:rgba(232,238,252,.75);
+  --green:#22c55e; --blue:#3b82f6; --gold:#f59e0b; --red:#ef4444; --r:18px;
+}
+*{box-sizing:border-box}
+body{margin:0; font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif; direction:rtl; color:var(--text);
+  background: radial-gradient(1200px 700px at 10% 10%, rgba(59,130,246,0.16), transparent 55%),
+              radial-gradient(900px 600px at 80% 20%, rgba(245,158,11,0.12), transparent 55%),
+              radial-gradient(1000px 700px at 60% 90%, rgba(34,197,94,0.12), transparent 55%), var(--bg);
+}
+img{max-width:100%; display:block}
+.layout{display:grid; grid-template-columns:310px 1fr; min-height:100vh}
+.sidebar{padding:18px; border-left:1px solid var(--border);
+  background: linear-gradient(180deg, rgba(13,19,32,.92), rgba(13,19,32,.70));
+  position:sticky; top:0; height:100vh; overflow:auto;
+}
+.brand__logo{width:100%; border-radius:16px; border:1px solid var(--border); background:rgba(0,0,0,.2)}
+.nav{display:flex; flex-direction:column; gap:10px; margin-top:14px}
+.nav__item{width:100%; text-align:right; padding:12px 14px; border-radius:14px;
+  border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); cursor:pointer; font-size:15px;
+}
+.nav__item:hover{background:rgba(255,255,255,.07)}
+.nav__item.active{background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.35)}
+.sidebar__footer{margin-top:16px; padding-top:14px; border-top:1px solid var(--border)}
+.small{font-size:13px; color:var(--muted)}
+.dim{opacity:.85}
+.pill{display:inline-block; margin-top:8px; padding:8px 10px; border-radius:999px; border:1px solid var(--border); background:rgba(255,255,255,.04)}
+.main{padding:18px}
+.topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px}
+.topbar h1{margin:0; font-size:22px}
+.card{background:var(--panel); border:1px solid var(--border); border-radius:var(--r); padding:16px; backdrop-filter:blur(10px)}
+.hero{display:grid; grid-template-columns:1.05fr 1fr; gap:14px; margin-bottom:14px}
+.hero__media img{border-radius:14px; border:1px solid var(--border)}
+.hero__text h2{margin:0 0 8px; font-size:20px}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.kpi{flex:1 1 160px; background:var(--panel2); border:1px solid var(--border); border-radius:14px; padding:12px}
+.kpi__label{font-size:12px; color:var(--muted)}
+.kpi__value{font-size:22px; font-weight:800; margin-top:4px}
+.stat{flex:1 1 200px; background:var(--panel2); border:1px solid var(--border); border-radius:14px; padding:12px}
+.stat__title{font-size:13px; color:var(--muted)}
+.stat__value{font-size:22px; font-weight:800; margin-top:6px}
+.toolbar{display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+.toolbar h2{margin:0; font-size:18px}
+.input{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); color:var(--text);
+  padding:10px 12px; border-radius:12px; outline:none; min-width:160px;
+}
+.btn{padding:10px 12px; border-radius:12px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.07); color:var(--text); cursor:pointer}
+.btn:hover{background:rgba(255,255,255,.10)}
+.btn--primary{background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.35)}
+.btn--primary:hover{background:rgba(34,197,94,.24)}
+.btn--ghost{background:transparent}
+.tableWrap{overflow:auto; border-radius:14px; border:1px solid var(--border)}
+.table{width:100%; border-collapse:collapse; min-width:720px}
+.table th,.table td{padding:10px; border-bottom:1px solid rgba(255,255,255,.08); text-align:right; vertical-align:middle}
+.badge{display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.05); font-size:12px}
+.badge--green{border-color:rgba(34,197,94,.45); background:rgba(34,197,94,.14)}
+.badge--gold{border-color:rgba(245,158,11,.45); background:rgba(245,158,11,.14)}
+.badge--blue{border-color:rgba(59,130,246,.45); background:rgba(59,130,246,.14)}
+.badge--red{border-color:rgba(239,68,68,.45); background:rgba(239,68,68,.14)}
+.page.hidden{display:none}
+
+/* Modal */
+.modalBack{position:fixed; inset:0; background:rgba(0,0,0,.62); display:flex; align-items:center; justify-content:center; padding:18px}
+.modalBack.hidden{display:none}
+.modal{width:min(1100px,100%); max-height:86vh; overflow:auto;
+  background:linear-gradient(180deg, rgba(13,19,32,.96), rgba(13,19,32,.80));
+  border:1px solid rgba(255,255,255,.14); border-radius:18px; padding:14px;
+}
+.modal__head{display:flex; justify-content:space-between; align-items:center; gap:12px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px}
+.card.inner{padding:12px; background:rgba(255,255,255,.04)}
+.form{display:grid; gap:8px}
+label{font-size:13px; color:var(--muted)}
+.col{flex:1 1 260px}
+.stages{display:grid; gap:10px}
+.stageRow{display:grid; grid-template-columns:1fr 160px 140px 140px; gap:8px; align-items:center; padding:10px;
+  border-radius:14px; border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04);
+}
+@media (max-width:980px){
+  .layout{grid-template-columns:1fr}
+  .sidebar{position:relative; height:auto}
+  .hero{grid-template-columns:1fr}
+  .grid2{grid-template-columns:1fr}
+  .table{min-width:600px}
+}
+
+
+/* Login */
+.loginBack{position:fixed; inset:0; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:18px; z-index:50}
+.loginBack.hidden{display:none}
+.loginCard{width:min(420px,100%); background:linear-gradient(180deg, rgba(13,19,32,.96), rgba(13,19,32,.82));
+  border:1px solid rgba(255,255,255,.14); border-radius:18px; padding:16px}
+.loginBrand{display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:10px; text-align:center}
+.loginBrand img{width:120px; border-radius:16px; border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.2)}
+.loginBrand h2{margin:0; font-size:20px}
+
+.tableActions{display:flex; gap:8px; flex-wrap:wrap}
+.hint{font-size:12px; color:var(--muted); margin-top:6px}
+hr.sep{border:0; border-top:1px solid rgba(255,255,255,.10); margin:12px 0}
