@@ -2,7 +2,6 @@
 (() => {
   const $ = (id) => document.getElementById(id);
 
-
   // -----------------------
   // Auth (online + multi users)
   // -----------------------
@@ -13,7 +12,7 @@
   const DEFAULT_ADMIN_PASS = "@1000@";
 
   function getToken(){ return localStorage.getItem(AUTH_TOKEN_KEY) || ""; }
-  function setToken(t){ 
+  function setToken(t){
     if(t) localStorage.setItem(AUTH_TOKEN_KEY, t);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
   }
@@ -60,8 +59,7 @@
     }catch{}
     // Fallback: local emergency admin (offline)
     if(username === DEFAULT_ADMIN_USER && password === DEFAULT_ADMIN_PASS){
-      // Offline token (not accepted by server, but lets UI open offline)
-      setToken("OFFLINE");
+      setToken("OFFLINE"); // UI open offline
       sessionStorage.setItem(AUTH_OK_KEY, "1");
       sessionStorage.setItem(AUTH_USER_KEY, username);
       return true;
@@ -92,7 +90,7 @@
     };
   }
 
-    let DB_MEM = null;
+  let DB_MEM = null;
   let pushTimer = null;
 
   function loadDB(){
@@ -171,7 +169,6 @@
     setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
   }
   function downloadExcelHtml(filename, title, headers, rows){
-    // Excel يفتح HTML كـ .xls
     const html = `<!doctype html><html><head><meta charset="utf-8"></head><body>
       <table border="1">
         <tr><th colspan="${headers.length}" style="font-size:16px">${title}</th></tr>
@@ -183,7 +180,6 @@
   }
 
   function parseCSV(text){
-    // parser بسيط (يدعم Quotes)
     const rows = [];
     let i=0, cur="", inQ=false, row=[];
     while(i<text.length){
@@ -279,13 +275,6 @@
       }
     },
 
-    inventory: {
-      title: "المخزن",
-      store: "inventory_items",
-      help: "تعريف الأصناف (مواد إنشائية/كهرباء/ماء/صحية/سيراميك/أصباغ/زجاج/حديد/ألمنيوم...) + حركات دخول/خروج.",
-      customRender: renderInventory,
-    },
-
     purchases: {
       title: "المشتريات",
       store: "purchases",
@@ -302,7 +291,6 @@
       ],
       defaultRow: () => ({التاريخ: todayISO(), نوع_الدفع:"نقد", الإجمالي:0, المدفوع:0, المتبقي:0}),
       afterSave: (db, row) => {
-        // تسجيل عملية بالحسابات تلقائياً إذا المدفوع > 0
         const paid = Number(row.المدفوع || 0);
         if(paid > 0){
           db.accounts.push({id:uid(), التاريخ: row.التاريخ || todayISO(), النوع:"مصروف", الفئة:"مشتريات", الوصف:`مشتريات - ${row.المورد||""}`.trim(), المبلغ: paid});
@@ -392,7 +380,7 @@
     sales: {
       title:"المبيعات",
       store:"sales",
-      help:"إدارة مبيعات الوحدات (منجزة/غير منجزة/نسبة الإنجاز) + مبالغ.",
+      help:"إدارة مبيعات الوحدات (محجوزة/مباعة/متاحة) + مبالغ.",
       fields:[
         {key:"رقم_الوحدة", label:"رقم الوحدة", type:"text", required:true},
         {key:"التاريخ", label:"التاريخ", type:"date"},
@@ -410,13 +398,6 @@
           db.accounts.push({id:uid(), التاريخ: row.التاريخ || todayISO(), النوع:"إيداع", الفئة:"أخرى", الوصف:`دفعة بيع وحدة ${row.رقم_الوحدة}`, المبلغ: paid});
         }
       }
-    },
-
-    reports: {
-      title:"التقارير",
-      store:null,
-      help:"تقارير يومي/أسبوعي/شهري (مشتريات/حسابات/مبيعات/رواتب) مع فلترة بالتاريخ.",
-      customRender: renderReports,
     },
   };
 
@@ -468,7 +449,7 @@
     const hook = (id, fn) => $(id)?.addEventListener("click", fn);
 
     hook(`${key}Refresh`, ()=> renderGenericTable(key));
-    $( `${key}Search`)?.addEventListener("keydown", (e)=>{ if(e.key==="Enter") renderGenericTable(key); });
+    $(`${key}Search`)?.addEventListener("keydown", (e)=>{ if(e.key==="Enter") renderGenericTable(key); });
 
     hook(`${key}Create`, ()=> openModalFor(key, null));
     if(m.seed){
@@ -498,7 +479,6 @@
     const db = loadDB();
     const arr = db[m.store] || [];
     const q = ($(`${key}Search`)?.value || "").trim().toLowerCase();
-
     const rows = q ? arr.filter(r => JSON.stringify(r).toLowerCase().includes(q)) : arr;
 
     const tbody = $(`${key}Tbody`);
@@ -570,7 +550,7 @@
         const idx = (map[f.key]!==undefined) ? map[f.key] : map[f.label];
         obj[f.key] = row[idx] ?? "";
       });
-      // إذا يوجد id في الأعمدة نستخدمه للتحديث
+
       const idIdx = map["id"];
       if(idIdx!==undefined && row[idIdx]){
         const sid = String(row[idIdx]);
@@ -594,7 +574,7 @@
   }
 
   // -----------------------
-  // Modal (Add/Edit/Delete)
+  // Modal (Add/Edit/Delete)  ✅ يعتمد على #modalBack الموجود بالـ HTML
   // -----------------------
   const modalBack = $("modalBack");
   const modalTitle = $("modalTitle");
@@ -612,13 +592,11 @@
     const arr = db[m.store] || [];
     const row = id ? arr.find(x=>x.id===id) : null;
 
-    if (modalTitle) {
-  modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
-}
+    modalCtx = { key, id };
+    modalTitle.textContent = (id ? "تعديل" : "إضافة") + " - " + m.title;
     modalSub.textContent = id ? ("ID: "+id) : "—";
     modalBack.classList.remove("hidden");
 
-    // Build form
     modalForm.innerHTML = m.fields.map(f=>{
       const v = row ? (row[f.key] ?? "") : (m.defaultRow ? (m.defaultRow()[f.key] ?? "") : "");
       const req = f.required ? "required" : "";
@@ -682,7 +660,6 @@
     }
     db[m.store] = arr;
 
-    // afterSave hook
     if(typeof m.afterSave === "function"){
       try{ m.afterSave(db, normalized); }catch{}
     }
@@ -706,452 +683,21 @@
   });
 
   // -----------------------
-  // Inventory (custom)
-  // -----------------------
-  function renderInventory(){
-    const el = $("page-inventory");
-    if(!el) return;
-
-    el.innerHTML = `
-      <div class="toolbar">
-        <div class="toolbar__left">
-          <h2>المخزن</h2>
-          <div class="small dim">أصناف + حركات (دخول/خروج) + المتبقي تلقائياً.</div>
-        </div>
-        <div class="toolbar__right tableActions">
-          <button class="btn btn--primary" id="invAddItem">+ إضافة صنف</button>
-          <button class="btn" id="invAddMoveIn">+ دخول</button>
-          <button class="btn" id="invAddMoveOut">+ خروج</button>
-          <button class="btn" id="invExportItemsXls">تصدير الأصناف Excel</button>
-          <button class="btn" id="invExportMovesXls">تصدير الحركات Excel</button>
-        </div>
-      </div>
-
-      <div class="grid2">
-        <div class="card inner">
-          <h3>الأصناف</h3>
-          <input class="input" id="invSearch" placeholder="بحث..." style="width:100%; margin-bottom:10px" />
-          <div class="tableWrap">
-            <table class="table" style="min-width:720px">
-              <thead><tr><th>إجراء</th><th>الصنف</th><th>الفئة</th><th>الوحدة</th><th>المتبقي</th></tr></thead>
-              <tbody id="invItemsTbody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card inner">
-          <h3>حركات المخزن</h3>
-          <div class="row" style="margin-bottom:10px">
-            <input class="input" id="invMovesFrom" type="date" />
-            <input class="input" id="invMovesTo" type="date" />
-            <button class="btn" id="invMovesFilter">فلترة</button>
-          </div>
-          <div class="tableWrap">
-            <table class="table" style="min-width:820px">
-              <thead><tr><th>إجراء</th><th>التاريخ</th><th>النوع</th><th>الصنف</th><th>الكمية</th><th>ملاحظة</th></tr></thead>
-              <tbody id="invMovesTbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="hint">الفئات المقترحة: مواد إنشائية / كهرباء / ماء / صحية / سيراميك / أصباغ / زجاج / حديد / ألمنيوم / أبواب / أخرى.</div>
-    `;
-
-    $("invAddItem")?.addEventListener("click", ()=> openInventoryItemModal(null));
-    $("invAddMoveIn")?.addEventListener("click", ()=> openInventoryMoveModal(null, "دخول"));
-    $("invAddMoveOut")?.addEventListener("click", ()=> openInventoryMoveModal(null, "خروج"));
-    $("invExportItemsXls")?.addEventListener("click", ()=> exportInventory("items"));
-    $("invExportMovesXls")?.addEventListener("click", ()=> exportInventory("moves"));
-
-    $("invMovesFilter")?.addEventListener("click", ()=> renderInventoryTables());
-    $("invSearch")?.addEventListener("keydown",(e)=>{ if(e.key==="Enter") renderInventoryTables(); });
-
-    renderInventoryTables();
-  }
-
-  function stockForItem(db, itemId){
-    let stock = 0;
-    (db.inventory_moves||[]).forEach(m=>{
-      if(Number(m.معرف_الصنف) !== Number(itemId)) return;
-      const q = Number(m.الكمية||0);
-      stock += (m.النوع === "دخول") ? q : -q;
-    });
-    return stock;
-  }
-
-  function renderInventoryTables(){
-    const db = loadDB();
-    const q = ($("invSearch")?.value || "").trim().toLowerCase();
-    const items = (db.inventory_items||[]).map(it => ({
-      ...it,
-      المتبقي: stockForItem(db, it.id)
-    })).filter(it => q ? JSON.stringify(it).toLowerCase().includes(q) : true);
-
-    const itBody = $("invItemsTbody");
-    if(itBody){
-      itBody.innerHTML = items.map(it=>`
-        <tr>
-          <td><button class="btn" data-it="${it.id}">عرض</button></td>
-          <td>${it.اسم_الصنف||""}</td>
-          <td>${it.الفئة||""}</td>
-          <td>${it.الوحدة||""}</td>
-          <td>${fmt.format(Number(it.المتبقي||0))}</td>
-        </tr>
-      `).join("") || `<tr><td colspan="5" class="small">لا توجد أصناف.</td></tr>`;
-      itBody.onclick = (e)=>{
-        const b = e.target.closest("[data-it]");
-        if(!b) return;
-        openInventoryItemModal(Number(b.dataset.it));
-      };
-    }
-
-    // Moves
-    const from = $("invMovesFrom")?.value || "";
-    const to = $("invMovesTo")?.value || "";
-    const moves = (db.inventory_moves||[]).filter(m=>{
-      const d = m.التاريخ || "";
-      if(from && d < from) return false;
-      if(to && d > to) return false;
-      return true;
-    }).sort((a,b)=>(b.التاريخ||"").localeCompare(a.التاريخ||""));
-
-    const mvBody = $("invMovesTbody");
-    if(mvBody){
-      mvBody.innerHTML = moves.map(m=>{
-        const item = (db.inventory_items||[]).find(it=>it.id===Number(m.معرف_الصنف));
-        return `<tr>
-          <td><button class="btn" data-mv="${m.id}">عرض</button></td>
-          <td>${m.التاريخ||""}</td>
-          <td>${m.النوع||""}</td>
-          <td>${item?.اسم_الصنف || "-"}</td>
-          <td>${fmt.format(Number(m.الكمية||0))}</td>
-          <td>${m.ملاحظة||""}</td>
-        </tr>`;
-      }).join("") || `<tr><td colspan="6" class="small">لا توجد حركات.</td></tr>`;
-      mvBody.onclick = (e)=>{
-        const b = e.target.closest("[data-mv]");
-        if(!b) return;
-        openInventoryMoveModal(Number(b.dataset.mv), null);
-      };
-    }
-
-    refreshKPIs(db);
-  }
-
-  function openInventoryItemModal(id){
-    const db = loadDB();
-    const arr = db.inventory_items || [];
-    const row = id ? arr.find(x=>x.id===id) : null;
-
-    modalCtx = { key:"inventory_item", id };
-    modalTitle.textContent = (id?"تعديل":"إضافة") + " - صنف مخزن";
-    modalSub.textContent = id ? ("ID: "+id) : "—";
-    modalBack.classList.remove("hidden");
-
-    const val = (k, def="") => row ? (row[k] ?? def) : def;
-
-    modalForm.innerHTML = `
-      <div><label>اسم الصنف *</label><input class="input" data-k="اسم_الصنف" value="${String(val("اسم_الصنف",""))}" /></div>
-      <div><label>الفئة</label>
-        <select class="input" data-k="الفئة">
-          ${["مواد إنشائية","كهرباء","ماء","صحية","سيراميك","أصباغ","زجاج","حديد","ألمنيوم","أبواب","أخرى"].map(o=>{
-            const sel = o===val("الفئة","مواد إنشائية") ? "selected" : "";
-            return `<option ${sel} value="${o}">${o}</option>`;
-          }).join("")}
-        </select>
-      </div>
-      <div><label>الوحدة (طن/صنف/م/كيس...)</label><input class="input" data-k="الوحدة" value="${String(val("الوحدة",""))}" /></div>
-      <div><label>ملاحظات</label><textarea class="input" data-k="ملاحظات" rows="3" style="min-height:90px">${String(val("ملاحظات",""))}</textarea></div>
-      <div class="hint">المتبقي يُحسب تلقائياً من الحركات (دخول/خروج).</div>
-    `;
-    modalDelete.style.display = id ? "inline-block" : "none";
-  }
-
-  function openInventoryMoveModal(id, forcedType){
-    const db = loadDB();
-    const moves = db.inventory_moves || [];
-    const items = db.inventory_items || [];
-    const row = id ? moves.find(x=>x.id===id) : null;
-
-    if(!items.length){
-      alert("أضف صنف أولاً.");
-      return;
-    }
-
-    modalCtx = { key:"inventory_move", id };
-    modalTitle.textContent = (id?"تعديل":"إضافة") + " - حركة مخزن";
-    modalSub.textContent = id ? ("ID: "+id) : "—";
-    modalBack.classList.remove("hidden");
-
-    const val = (k, def="") => row ? (row[k] ?? def) : def;
-    const defType = forcedType || val("النوع","دخول");
-    const defItem = Number(val("معرف_الصنف", items[0]?.id || 0));
-
-    modalForm.innerHTML = `
-      <div><label>التاريخ *</label><input class="input" data-k="التاريخ" type="date" value="${String(val("التاريخ", todayISO()))}" /></div>
-      <div><label>النوع *</label>
-        <select class="input" data-k="النوع">
-          <option value="دخول" ${defType==="دخول"?"selected":""}>دخول</option>
-          <option value="خروج" ${defType==="خروج"?"selected":""}>خروج</option>
-        </select>
-      </div>
-      <div><label>الصنف *</label>
-        <select class="input" data-k="معرف_الصنف">
-          ${items.map(it=>`<option value="${it.id}" ${it.id===defItem?"selected":""}>${it.اسم_الصنف}</option>`).join("")}
-        </select>
-      </div>
-      <div><label>الكمية *</label><input class="input" data-k="الكمية" type="number" step="0.01" value="${String(val("الكمية", 0))}" /></div>
-      <div><label>ملاحظة</label><input class="input" data-k="ملاحظة" value="${String(val("ملاحظة",""))}" /></div>
-      <div class="hint">لـ (خروج) يمكنك كتابة: اسم الوحدة/المقاول/سبب الصرف داخل الملاحظة.</div>
-    `;
-    modalDelete.style.display = id ? "inline-block" : "none";
-  }
-
-  function saveInventoryFromModal(){
-    const db = loadDB();
-    if(modalCtx.key==="inventory_item"){
-      const arr = db.inventory_items || [];
-      const id = modalCtx.id || uid();
-      const name = (modalForm.querySelector(`[data-k="اسم_الصنف"]`)?.value || "").trim();
-      if(!name) return alert("اكتب اسم الصنف.");
-      const obj = {
-        id,
-        اسم_الصنف: name,
-        الفئة: modalForm.querySelector(`[data-k="الفئة"]`)?.value || "مواد إنشائية",
-        الوحدة: (modalForm.querySelector(`[data-k="الوحدة"]`)?.value || "").trim(),
-        ملاحظات: (modalForm.querySelector(`[data-k="ملاحظات"]`)?.value || "").trim(),
-      };
-      const idx = arr.findIndex(x=>x.id===id);
-      if(idx>=0) arr[idx] = Object.assign(arr[idx], obj);
-      else arr.push(obj);
-      db.inventory_items = arr;
-      saveDB(db);
-      closeModal();
-      renderAll();
-      return;
-    }
-    if(modalCtx.key==="inventory_move"){
-      const arr = db.inventory_moves || [];
-      const id = modalCtx.id || uid();
-      const dt = modalForm.querySelector(`[data-k="التاريخ"]`)?.value || "";
-      const type = modalForm.querySelector(`[data-k="النوع"]`)?.value || "دخول";
-      const itemId = Number(modalForm.querySelector(`[data-k="معرف_الصنف"]`)?.value || 0);
-      const qty = Number(modalForm.querySelector(`[data-k="الكمية"]`)?.value || 0);
-      if(!dt || !itemId || qty<=0) return alert("أكمل (التاريخ/الصنف/الكمية).");
-      const obj = {
-        id,
-        التاريخ: dt,
-        النوع: type,
-        معرف_الصنف: itemId,
-        الكمية: qty,
-        ملاحظة: (modalForm.querySelector(`[data-k="ملاحظة"]`)?.value || "").trim(),
-      };
-      const idx = arr.findIndex(x=>x.id===id);
-      if(idx>=0) arr[idx] = Object.assign(arr[idx], obj);
-      else arr.push(obj);
-      db.inventory_moves = arr;
-      saveDB(db);
-      closeModal();
-      renderAll();
-      return;
-    }
-  }
-
-  function deleteInventoryFromModal(){
-    const db = loadDB();
-    if(modalCtx.key==="inventory_item"){
-      const id = modalCtx.id;
-      if(!id) return;
-      // منع الحذف إذا يوجد حركات
-      const hasMoves = (db.inventory_moves||[]).some(m=>Number(m.معرف_الصنف)===Number(id));
-      if(hasMoves && !confirm("هذا الصنف لديه حركات. حذف الصنف سيحذف الحركات أيضاً. متابعة؟")) return;
-      db.inventory_moves = (db.inventory_moves||[]).filter(m=>Number(m.معرف_الصنف)!==Number(id));
-      db.inventory_items = (db.inventory_items||[]).filter(x=>x.id!==id);
-      saveDB(db);
-      closeModal();
-      renderAll();
-      return;
-    }
-    if(modalCtx.key==="inventory_move"){
-      const id = modalCtx.id;
-      if(!id) return;
-      db.inventory_moves = (db.inventory_moves||[]).filter(x=>x.id!==id);
-      saveDB(db);
-      closeModal();
-      renderAll();
-      return;
-    }
-  }
-
-  function exportInventory(which){
-    const db = loadDB();
-    if(which==="items"){
-      const headers = [
-        {key:"id", label:"id"},
-        {key:"اسم_الصنف", label:"اسم_الصنف"},
-        {key:"الفئة", label:"الفئة"},
-        {key:"الوحدة", label:"الوحدة"},
-        {key:"ملاحظات", label:"ملاحظات"},
-        {key:"المتبقي", label:"المتبقي"},
-      ];
-      const rows = (db.inventory_items||[]).map(it=>({
-        id: it.id,
-        اسم_الصنف: it.اسم_الصنف,
-        الفئة: it.الفئة,
-        الوحدة: it.الوحدة,
-        ملاحظات: it.ملاحظات,
-        المتبقي: stockForItem(db, it.id),
-      }));
-      downloadExcelHtml(`majma_adl_inventory_items_${todayISO()}.xls`, "أصناف المخزن", headers, rows);
-    }else{
-      const headers = [
-        {key:"id", label:"id"},
-        {key:"التاريخ", label:"التاريخ"},
-        {key:"النوع", label:"النوع"},
-        {key:"معرف_الصنف", label:"معرف_الصنف"},
-        {key:"اسم_الصنف", label:"اسم_الصنف"},
-        {key:"الكمية", label:"الكمية"},
-        {key:"ملاحظة", label:"ملاحظة"},
-      ];
-      const rows = (db.inventory_moves||[]).map(m=>{
-        const it = (db.inventory_items||[]).find(x=>x.id===Number(m.معرف_الصنف));
-        return { ...m, اسم_الصنف: it?.اسم_الصنف || "" };
-      });
-      downloadExcelHtml(`majma_adl_inventory_moves_${todayISO()}.xls`, "حركات المخزن", headers, rows);
-    }
-  }
-
-  // -----------------------
-  // Reports (custom)
-  // -----------------------
-  function sumByPeriod(arr, dateKey, amountKey, from, to){
-    const within = arr.filter(x=>{
-      const d = x[dateKey] || "";
-      if(from && d < from) return false;
-      if(to && d > to) return false;
-      return true;
-    });
-    const total = within.reduce((s,x)=>s + Number(x[amountKey]||0), 0);
-    return {count: within.length, total};
-  }
-
-  function renderReports(){
-    const el = $("page-reports");
-    if(!el) return;
-    const db = loadDB();
-    el.innerHTML = `
-      <div class="toolbar">
-        <div class="toolbar__left">
-          <h2>التقارير</h2>
-          <div class="small dim">فلترة بالتاريخ ثم عرض المجاميع (يومي/أسبوعي/شهري).</div>
-        </div>
-        <div class="toolbar__right tableActions">
-          <input class="input" id="repFrom" type="date" />
-          <input class="input" id="repTo" type="date" />
-          <button class="btn btn--primary" id="repRun">تحديث التقرير</button>
-          <button class="btn" id="repExportXls">تصدير Excel</button>
-        </div>
-      </div>
-
-      <div class="grid2" id="repBox"></div>
-      <hr class="sep">
-      <div class="card inner">
-        <h3>تفاصيل الحسابات (Ledger)</h3>
-        <div class="tableWrap">
-          <table class="table" style="min-width:900px">
-            <thead><tr><th>التاريخ</th><th>النوع</th><th>الفئة</th><th>الوصف</th><th>المبلغ</th></tr></thead>
-            <tbody id="repLedger"></tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    $("repRun")?.addEventListener("click", ()=> runReport());
-    $("repExportXls")?.addEventListener("click", ()=> exportReportXls());
-    runReport();
-
-    function runReport(){
-      const from = $("repFrom")?.value || "";
-      const to = $("repTo")?.value || "";
-      const purchasesPaid = sumByPeriod(db.purchases||[], "التاريخ", "المدفوع", from, to);
-      const accountsExp = sumByPeriod((db.accounts||[]).filter(x=>x.النوع==="مصروف"), "التاريخ", "المبلغ", from, to);
-      const accountsDep = sumByPeriod((db.accounts||[]).filter(x=>x.النوع==="إيداع"), "التاريخ", "المبلغ", from, to);
-      const salesPaid = sumByPeriod(db.sales||[], "التاريخ", "المدفوع", from, to);
-
-      const box = $("repBox");
-      box.innerHTML = `
-        ${card("المشتريات (المدفوع)", purchasesPaid.count, purchasesPaid.total)}
-        ${card("المصروفات", accountsExp.count, accountsExp.total)}
-        ${card("الإيداعات", accountsDep.count, accountsDep.total)}
-        ${card("مبيعات (المدفوع)", salesPaid.count, salesPaid.total)}
-      `;
-
-      const ledger = (db.accounts||[]).filter(x=>{
-        const d = x.التاريخ||"";
-        if(from && d<from) return false;
-        if(to && d>to) return false;
-        return true;
-      }).sort((a,b)=>(b.التاريخ||"").localeCompare(a.التاريخ||""));
-      $("repLedger").innerHTML = ledger.map(x=>`
-        <tr>
-          <td>${x.التاريخ||""}</td>
-          <td>${x.النوع||""}</td>
-          <td>${x.الفئة||""}</td>
-          <td>${x.الوصف||""}</td>
-          <td>${fmt.format(Number(x.المبلغ||0))}</td>
-        </tr>
-      `).join("") || `<tr><td colspan="5" class="small">لا توجد بيانات ضمن الفترة.</td></tr>`;
-    }
-
-    function card(title, count, total){
-      return `<div class="card inner">
-        <div class="small dim">${title}</div>
-        <div style="font-size:26px; font-weight:800; margin-top:6px">${fmt.format(Number(total||0))}</div>
-        <div class="small dim">عدد العمليات: ${fmt.format(Number(count||0))}</div>
-      </div>`;
-    }
-
-    function exportReportXls(){
-      const from = $("repFrom")?.value || "";
-      const to = $("repTo")?.value || "";
-      const rows = (db.accounts||[]).filter(x=>{
-        const d = x.التاريخ||"";
-        if(from && d<from) return false;
-        if(to && d>to) return false;
-        return true;
-      });
-      const headers = [
-        {key:"التاريخ", label:"التاريخ"},
-        {key:"النوع", label:"النوع"},
-        {key:"الفئة", label:"الفئة"},
-        {key:"الوصف", label:"الوصف"},
-        {key:"المبلغ", label:"المبلغ"},
-        {key:"ملاحظات", label:"ملاحظات"},
-      ];
-      downloadExcelHtml(`majma_adl_report_ledger_${todayISO()}.xls`, "تقرير الحسابات", headers, rows);
-    }
-  }
-
-  // -----------------------
   // Render routing
   // -----------------------
   function renderPage(key){
     if(key==="dashboard"){ renderDashboard(); return; }
     const m = Modules[key];
     if(!m) return;
-    if(typeof m.customRender==="function"){ m.customRender(); return; }
     buildGenericPage(key);
   }
 
   function renderDashboard(){
-    // dashboard already in HTML, just refresh KPIs
     const db = loadDB();
     refreshKPIs(db);
   }
 
   function refreshKPIs(db){
-    // Units KPIs
     const units = db.units || [];
     const totalUnits = units.length;
     const inProg = units.filter(u=>u.الحالة==="قيد التنفيذ").length;
@@ -1161,12 +707,11 @@
     $("kpiInProgress") && ($("kpiInProgress").textContent = fmt.format(inProg));
     $("kpiDone") && ($("kpiDone").textContent = fmt.format(done));
 
-    // Accounts balance
     let balance = 0;
     (db.accounts||[]).forEach(x=>{
       const amt = Number(x.المبلغ||0);
       if(x.النوع==="إيداع") balance += amt;
-      else balance -= amt; // سحب/مصروف
+      else balance -= amt;
     });
     $("kpiBalance") && ($("kpiBalance").textContent = fmt.format(balance));
 
@@ -1185,83 +730,6 @@
   }
 
   // -----------------------
-  // Global export/import
-  // -----------------------
-  function exportAll(){
-    const db = loadDB();
-    // JSON كامل
-    downloadText(`majma_adl_backup_${todayISO()}.json`, JSON.stringify(db, null, 2), "application/json;charset=utf-8");
-    // Excel (xls) لكل جدول مهم
-    // (يعرض للمستخدم: يفتحهم واحد واحد، لأن إنشاء ملف واحد متعدد الشيت يحتاج مكتبة)
-    alert("تم تنزيل نسخة JSON كاملة. ولتصدير Excel لكل قسم استخدم أزرار التصدير داخل الأقسام.");
-  }
-
-  async function importAll(file){
-    const text = await readFileText(file);
-    if(file.name.toLowerCase().endsWith(".json")){
-      try{
-        const obj = JSON.parse(text);
-        localStorage.setItem(DB_KEY, JSON.stringify(Object.assign(emptyDB(), obj||{})));
-        alert("تم الاستيراد بنجاح.");
-        renderAll();
-      }catch{
-        alert("ملف JSON غير صالح.");
-      }
-      return;
-    }
-    alert("الاستيراد العام يدعم JSON فقط. للاستيراد من CSV استخدم زر الاستيراد داخل كل قسم.");
-  }
-
-  // -----------------------
-  // Settings / Buttons
-  // -----------------------
-  $("exportAllBtn")?.addEventListener("click", exportAll);
-  $("exportJsonBtn")?.addEventListener("click", ()=>{
-    const db = loadDB();
-    downloadText(`majma_adl_backup_${todayISO()}.json`, JSON.stringify(db, null, 2), "application/json;charset=utf-8");
-  });
-
-  $("importAllFile")?.addEventListener("change", async (e)=>{
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if(!f) return;
-    await importAll(f);
-  });
-
-  $("importJsonFile")?.addEventListener("change", async (e)=>{
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if(!f) return;
-    await importAll(f);
-  });
-
-  $("lockBtn")?.addEventListener("click", lock);
-
-  $("wipeBtn")?.addEventListener("click", ()=>{
-    if(!confirm("سيتم حذف كل البيانات المحفوظة محلياً. هل أنت متأكد؟")) return;
-    localStorage.removeItem(DB_KEY);
-    alert("تم حذف البيانات.");
-    renderAll();
-  });
-
-  $("savePassBtn")?.addEventListener("click", ()=>{
-    const v = ($("newPass")?.value || "").trim();
-    if(!v) return alert("اكتب كلمة المرور.");
-    localStorage.setItem(PASS_KEY, v);
-    alert("تم حفظ كلمة المرور.");
-    $("newPass").value = "";
-  });
-
-  // Intercept modal buttons for inventory custom
-  modalSave?.addEventListener("click", ()=>{
-    if(modalCtx.key==="inventory_item" || modalCtx.key==="inventory_move") saveInventoryFromModal();
-  }, true);
-
-  modalDelete?.addEventListener("click", ()=>{
-    if(modalCtx.key==="inventory_item" || modalCtx.key==="inventory_move") deleteInventoryFromModal();
-  }, true);
-
-  // -----------------------
   // PWA
   // -----------------------
   async function registerSW(){
@@ -1272,8 +740,7 @@
   // -----------------------
   // Boot
   // -----------------------
-    async function boot(){
-    // Auth gate
+  async function boot(){
     if(!isAuthed()){
       showLogin(true);
       const btn = $("loginBtn");
@@ -1288,8 +755,8 @@
         if(ok){
           showLogin(false);
           if(inpPass) inpPass.value = "";
-          // حاول مزامنة من السيرفر
           await syncFromServer();
+          showPage("dashboard");
           renderAll();
         }else{
           alert("بيانات الدخول غير صحيحة.");
@@ -1302,11 +769,8 @@
     }
 
     showLogin(false);
-
-    // Sync from server on load (if online)
     await syncFromServer();
 
-    // Ensure 500 units first time
     const db = loadDB();
     Modules.units.seed(db);
     saveDB(db);
